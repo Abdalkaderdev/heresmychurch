@@ -1,0 +1,441 @@
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { Search, X, ChevronRight, Loader2, MapPin, ChevronDown } from "lucide-react";
+import type { Church, StateInfo } from "./church-data";
+import { getSizeCategory } from "./church-data";
+import { searchChurches } from "./api";
+import type { SearchResult } from "./api";
+
+// Full state name lookup for search results
+const STATE_NAMES: Record<string, string> = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+  CO: "Colorado", CT: "Connecticut", DE: "Delaware", DC: "D.C.", FL: "Florida",
+  GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana",
+  IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine",
+  MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota",
+  MS: "Mississippi", MO: "Missouri", MT: "Montana", NE: "Nebraska",
+  NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico",
+  NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio",
+  OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island",
+  SC: "South Carolina", SD: "South Dakota", TN: "Tennessee", TX: "Texas",
+  UT: "Utah", VT: "Vermont", VA: "Virginia", WA: "Washington",
+  WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+};
+
+interface MapSearchBarProps {
+  churches: Church[];
+  states: StateInfo[];
+  focusedState: string | null;
+  focusedStateName: string;
+  navigateToChurch: (stateAbbrev: string, churchId: string) => void;
+  onPreloadChurch?: (church: Church) => void;
+}
+
+const MAX_RESULTS = 8;
+const DEBOUNCE_MS = 300;
+
+export function MapSearchBar({
+  churches,
+  states,
+  focusedState,
+  focusedStateName,
+  navigateToChurch,
+  onPreloadChurch,
+}: MapSearchBarProps) {
+  const [query, setQuery] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // State filter for national view
+  const [stateFilter, setStateFilter] = useState<string | null>(null);
+  const [showStateDropdown, setShowStateDropdown] = useState(false);
+  const stateDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Server-side search state (national view)
+  const [remoteResults, setRemoteResults] = useState<SearchResult[]>([]);
+  const [remoteLoading, setRemoteLoading] = useState(false);
+  const [remoteSearched, setRemoteSearched] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const searchVersionRef = useRef(0);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!isFocused && !showStateDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsFocused(false);
+        setShowStateDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [isFocused, showStateDropdown]);
+
+  // Reset query when switching views
+  useEffect(() => {
+    setQuery("");
+    setSelectedIndex(-1);
+    setRemoteResults([]);
+    setRemoteSearched(false);
+    setStateFilter(null);
+    setShowStateDropdown(false);
+  }, [focusedState]);
+
+  // Populated states sorted alphabetically for the dropdown
+  const populatedStates = useMemo(() => {
+    return states
+      .filter((s) => s.isPopulated)
+      .sort((a, b) => (STATE_NAMES[a.abbrev] || a.abbrev).localeCompare(STATE_NAMES[b.abbrev] || b.abbrev));
+  }, [states]);
+
+  // Local search for state view
+  const localResults = useMemo(() => {
+    if (!focusedState || churches.length === 0) return [];
+    const q = query.toLowerCase().trim();
+    if (!q) return [];
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const matched: Church[] = [];
+    for (const ch of churches) {
+      if (matched.length >= MAX_RESULTS) break;
+      const haystack = `${ch.name} ${ch.city} ${ch.denomination} ${ch.address || ""}`.toLowerCase();
+      if (tokens.every((t) => haystack.includes(t))) {
+        matched.push(ch);
+      }
+    }
+    return matched;
+  }, [query, focusedState, churches]);
+
+  // Debounced server search for national view
+  useEffect(() => {
+    if (focusedState) return; // local search handles state view
+    const q = query.trim();
+    if (q.length < 2) {
+      setRemoteResults([]);
+      setRemoteSearched(false);
+      setRemoteLoading(false);
+      return;
+    }
+
+    setRemoteLoading(true);
+    const version = ++searchVersionRef.current;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const data = await searchChurches(q, MAX_RESULTS, stateFilter || undefined);
+        if (searchVersionRef.current !== version) return;
+        setRemoteResults(data.results);
+        setRemoteSearched(true);
+      } catch (err) {
+        console.error("[MapSearchBar] Search failed:", err);
+        if (searchVersionRef.current !== version) return;
+        setRemoteResults([]);
+        setRemoteSearched(true);
+      } finally {
+        if (searchVersionRef.current === version) {
+          setRemoteLoading(false);
+        }
+      }
+    }, DEBOUNCE_MS);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query, focusedState, stateFilter]);
+
+  // Reset selected index when results change
+  const resultCount = focusedState ? localResults.length : remoteResults.length;
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [resultCount, query]);
+
+  const handleSelectLocal = useCallback(
+    (church: Church) => {
+      if (focusedState) {
+        navigateToChurch(focusedState, church.id);
+      }
+      setQuery("");
+      setIsFocused(false);
+      inputRef.current?.blur();
+    },
+    [focusedState, navigateToChurch]
+  );
+
+  const handleSelectRemote = useCallback(
+    (result: SearchResult) => {
+      // Preload church data so the map can show it instantly without loading overlay
+      if (onPreloadChurch && result.lat && result.lng) {
+        onPreloadChurch({
+          id: result.id,
+          name: result.name,
+          city: result.city,
+          state: result.state,
+          lat: result.lat,
+          lng: result.lng,
+          attendance: result.attendance,
+          denomination: result.denomination,
+          address: result.address || "",
+        });
+      }
+      navigateToChurch(result.state, result.id);
+      setQuery("");
+      setIsFocused(false);
+      inputRef.current?.blur();
+    },
+    [navigateToChurch, onPreloadChurch]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const count = focusedState ? localResults.length : remoteResults.length;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(i + 1, count - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(i - 1, -1));
+      } else if (e.key === "Enter" && selectedIndex >= 0) {
+        e.preventDefault();
+        if (focusedState && localResults[selectedIndex]) {
+          handleSelectLocal(localResults[selectedIndex]);
+        } else if (!focusedState && remoteResults[selectedIndex]) {
+          handleSelectRemote(remoteResults[selectedIndex]);
+        }
+      } else if (e.key === "Escape") {
+        setIsFocused(false);
+        inputRef.current?.blur();
+      }
+    },
+    [focusedState, localResults, remoteResults, selectedIndex, handleSelectLocal, handleSelectRemote]
+  );
+
+  const showDropdown = isFocused && query.trim().length > 0;
+  const isNational = !focusedState;
+  const hasPopulated = states.some((s) => s.isPopulated);
+  const hasMultiplePopulated = populatedStates.length > 1;
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-[min(380px,calc(100vw-7rem))]"
+    >
+      {/* State filter dropdown — rendered above the results */}
+      {showStateDropdown && isNational && hasMultiplePopulated && (
+        <div
+          ref={stateDropdownRef}
+          className="mb-2 rounded-xl shadow-2xl overflow-hidden max-h-[40vh] overflow-y-auto"
+          style={{ backgroundColor: "rgba(30, 16, 64, 0.97)" }}
+        >
+          <div className="px-3 py-2 text-[10px] font-medium text-white/30 uppercase tracking-wider border-b border-white/5">
+            Filter by state
+          </div>
+          <button
+            className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
+              !stateFilter ? "bg-purple-500/20 text-purple-300" : "text-white/70 hover:bg-white/5"
+            }`}
+            onClick={() => {
+              setStateFilter(null);
+              setShowStateDropdown(false);
+            }}
+          >
+            <MapPin size={12} className="flex-shrink-0 opacity-50" />
+            All states
+          </button>
+          {populatedStates.map((s) => (
+            <button
+              key={s.abbrev}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
+                stateFilter === s.abbrev ? "bg-purple-500/20 text-purple-300" : "text-white/70 hover:bg-white/5"
+              }`}
+              onClick={() => {
+                setStateFilter(s.abbrev);
+                setShowStateDropdown(false);
+                inputRef.current?.focus();
+              }}
+            >
+              <span className="w-5 text-[10px] text-white/30 font-mono flex-shrink-0">{s.abbrev}</span>
+              {STATE_NAMES[s.abbrev] || s.abbrev}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Results dropdown — rendered above the input */}
+      {showDropdown && !showStateDropdown && (
+        <div
+          className="mb-2 rounded-xl shadow-2xl overflow-hidden max-h-[50vh] overflow-y-auto"
+          style={{ backgroundColor: "rgba(30, 16, 64, 0.97)" }}
+        >
+          {/* State view: local results */}
+          {focusedState && (
+            <>
+              {localResults.length === 0 ? (
+                <div className="px-4 py-3 text-xs text-white/40 text-center">
+                  No churches found for &ldquo;{query}&rdquo;
+                </div>
+              ) : (
+                <div className="py-1">
+                  {localResults.map((ch, i) => {
+                    const sizeCat = getSizeCategory(ch.attendance);
+                    return (
+                      <button
+                        key={ch.id}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                          i === selectedIndex ? "bg-white/10" : "hover:bg-white/5"
+                        }`}
+                        onMouseEnter={() => setSelectedIndex(i)}
+                        onClick={() => handleSelectLocal(ch)}
+                      >
+                        <div
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: sizeCat.color }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-white font-medium truncate">
+                            {ch.name}
+                          </div>
+                          <div className="text-xs text-white/40 truncate">
+                            {ch.city && <span>{ch.city} · </span>}
+                            {ch.denomination === "Other" || ch.denomination === "Unknown"
+                              ? "Non-denominational"
+                              : ch.denomination}
+                            {" · "}~{ch.attendance.toLocaleString()}
+                          </div>
+                        </div>
+                        <ChevronRight size={14} className="text-white/20 flex-shrink-0" />
+                      </button>
+                    );
+                  })}
+                  {localResults.length >= MAX_RESULTS && (
+                    <div className="px-4 py-2 text-xs text-white/30 text-center border-t border-white/5">
+                      Keep typing to narrow results…
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* National view: remote results */}
+          {isNational && (
+            <>
+              {remoteLoading && !remoteSearched ? (
+                <div className="px-4 py-3 flex items-center justify-center gap-2">
+                  <Loader2 size={14} className="text-purple-400 animate-spin" />
+                  <span className="text-xs text-white/40">Searching…</span>
+                </div>
+              ) : remoteSearched && remoteResults.length === 0 ? (
+                <div className="px-4 py-3 text-xs text-white/40 text-center">
+                  {!hasPopulated
+                    ? "Explore a state first to enable search"
+                    : <>No churches found for &ldquo;{query}&rdquo;</>}
+                </div>
+              ) : remoteResults.length > 0 ? (
+                <div className="py-1">
+                  {remoteResults.map((r, i) => {
+                    const sizeCat = getSizeCategory(r.attendance);
+                    return (
+                      <button
+                        key={`${r.state}-${r.id}`}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                          i === selectedIndex ? "bg-white/10" : "hover:bg-white/5"
+                        }`}
+                        onMouseEnter={() => setSelectedIndex(i)}
+                        onClick={() => handleSelectRemote(r)}
+                      >
+                        <div
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: sizeCat.color }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-white font-medium truncate">
+                            {r.name}
+                          </div>
+                          <div className="text-xs text-white/40 truncate">
+                            {r.city && <span>{r.city}, </span>}
+                            <span className="text-purple-300/70">{STATE_NAMES[r.state] || r.state}</span>
+                            {" · "}
+                            {r.denomination === "Other" || r.denomination === "Unknown"
+                              ? "Non-denom."
+                              : r.denomination}
+                          </div>
+                        </div>
+                        <ChevronRight size={14} className="text-white/20 flex-shrink-0" />
+                      </button>
+                    );
+                  })}
+                  {remoteResults.length >= MAX_RESULTS && (
+                    <div className="px-4 py-2 text-xs text-white/30 text-center border-t border-white/5">
+                      Keep typing to narrow results…
+                    </div>
+                  )}
+                  {remoteLoading && (
+                    <div className="px-4 py-1.5 flex items-center justify-center border-t border-white/5">
+                      <Loader2 size={12} className="text-purple-400/50 animate-spin" />
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Search input */}
+      <div
+        className={`flex items-center gap-2 rounded-full shadow-lg px-3 py-2.5 transition-all ${
+          isFocused ? "ring-2 ring-purple-500/40 shadow-xl" : ""
+        }`}
+        style={{ backgroundColor: "rgba(30, 16, 64, 0.92)" }}
+      >
+        {/* State filter chip — national view only */}
+        {isNational && hasMultiplePopulated && (
+          <button
+            onClick={() => setShowStateDropdown((v) => !v)}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0 transition-colors ${
+              stateFilter
+                ? "bg-purple-500/30 text-purple-200 hover:bg-purple-500/40"
+                : "bg-white/8 text-white/40 hover:bg-white/12 hover:text-white/60"
+            }`}
+          >
+            {stateFilter ? stateFilter : "State"}
+            <ChevronDown size={10} className={`transition-transform ${showStateDropdown ? "rotate-180" : ""}`} />
+          </button>
+        )}
+        <Search size={15} className="text-purple-400 flex-shrink-0" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => { setIsFocused(true); setShowStateDropdown(false); }}
+          onKeyDown={handleKeyDown}
+          placeholder={
+            focusedState
+              ? `Search churches in ${focusedStateName}…`
+              : stateFilter
+              ? `Search in ${STATE_NAMES[stateFilter] || stateFilter}…`
+              : "Find a church…"
+          }
+          className="flex-1 bg-transparent text-white text-sm placeholder:text-white/30 outline-none min-w-0"
+        />
+        {(query || stateFilter) && (
+          <button
+            onClick={() => {
+              if (query) {
+                setQuery("");
+                inputRef.current?.focus();
+              } else {
+                setStateFilter(null);
+              }
+            }}
+            className="text-white/30 hover:text-white/60 transition-colors"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,173 @@
+/**
+ * ChurchDots — High-performance SVG circle renderer for church markers.
+ *
+ * Replaces per-church <Marker> components (which each carry 2 useState hooks,
+ * 6 event handlers, and a wrapper <g>) with raw <circle> elements projected
+ * once via useMapContext(). For 10k churches this eliminates ~20k React hooks
+ * and ~60k function allocations per render.
+ *
+ * Additional optimisations:
+ *  • Viewport culling in SVG-coordinate space (skips off-screen dots)
+ *  • Event delegation (one handler on parent <g>, data-id hit testing)
+ *  • React.memo isolation (hover/tooltip changes don't re-render dots)
+ *  • Selected church rendered as a separate overlay (no sort per frame)
+ */
+
+import { memo, useMemo, useCallback } from "react";
+// @ts-ignore — react-simple-maps doesn't ship type definitions for useMapContext
+import { useMapContext } from "react-simple-maps";
+import { getSizeCategory } from "./church-data";
+import type { Church } from "./church-data";
+
+interface ChurchDotsProps {
+  churches: Church[];
+  selectedChurchId: string | null;
+  zoom: number;
+  center: [number, number];
+  onChurchClick: (church: Church) => void;
+  onChurchHover: (church: Church | null) => void;
+}
+
+interface ProjectedChurch {
+  id: string;
+  x: number;
+  y: number;
+  r: number;
+  color: string;
+  church: Church;
+}
+
+export const ChurchDots = memo(function ChurchDots({
+  churches,
+  selectedChurchId,
+  zoom,
+  center,
+  onChurchClick,
+  onChurchHover,
+}: ChurchDotsProps) {
+  const { projection } = useMapContext();
+
+  // ── O(1) lookup for event delegation ──
+  const churchById = useMemo(() => {
+    const map = new Map<string, Church>();
+    for (const ch of churches) map.set(ch.id, ch);
+    return map;
+  }, [churches]);
+
+  // ── Project all churches (stable unless churches array changes) ──
+  const projected = useMemo(() => {
+    const result: ProjectedChurch[] = [];
+    for (const ch of churches) {
+      const coords = projection([ch.lng, ch.lat]);
+      if (!coords) continue; // geoAlbersUsa returns null outside domain
+      const cat = getSizeCategory(ch.attendance);
+      result.push({
+        id: ch.id,
+        x: coords[0],
+        y: coords[1],
+        r: cat.radius,
+        color: cat.color,
+        church: ch,
+      });
+    }
+    return result;
+  }, [churches, projection]);
+
+  // ── Viewport cull (runs when center/zoom changes after pan ends) ──
+  const visible = useMemo(() => {
+    // At zoom ≤ 1.5 the whole US is visible — skip culling
+    if (zoom <= 1.5) return projected;
+
+    // Convert geographic center → SVG coordinates
+    const centerSvg = projection(center);
+    if (!centerSvg) return projected;
+
+    // ComposableMap default viewBox is 800×600
+    // Visible SVG half-extents shrink with zoom; add 50% margin to prevent pop-in
+    const halfW = (400 / zoom) * 1.5;
+    const halfH = (300 / zoom) * 1.5;
+    const cx = centerSvg[0];
+    const cy = centerSvg[1];
+
+    return projected.filter(
+      (p) => Math.abs(p.x - cx) < halfW && Math.abs(p.y - cy) < halfH
+    );
+  }, [projected, center, zoom, projection]);
+
+  // ── Event delegation handlers (one per parent <g>) ──
+  const handleClick = useCallback(
+    (e: React.MouseEvent<SVGGElement>) => {
+      const id = (e.target as SVGElement).getAttribute("data-id");
+      if (id) {
+        const ch = churchById.get(id);
+        if (ch) {
+          e.stopPropagation(); // Prevent click from reaching background rect (navigate-back)
+          onChurchClick(ch);
+        }
+      }
+    },
+    [churchById, onChurchClick]
+  );
+
+  const handleMouseOver = useCallback(
+    (e: React.MouseEvent<SVGGElement>) => {
+      const id = (e.target as SVGElement).getAttribute("data-id");
+      if (id) {
+        const ch = churchById.get(id);
+        if (ch) onChurchHover(ch);
+      }
+    },
+    [churchById, onChurchHover]
+  );
+
+  const handleMouseOut = useCallback(() => {
+    onChurchHover(null);
+  }, [onChurchHover]);
+
+  // ── Find selected entry for top-layer overlay ──
+  const selectedEntry = selectedChurchId
+    ? visible.find((v) => v.id === selectedChurchId)
+    : null;
+
+  return (
+    <g
+      onClick={handleClick}
+      onMouseOver={handleMouseOver}
+      onMouseOut={handleMouseOut}
+      style={{ cursor: "pointer" }}
+    >
+      {/* Main dots — non-selected churches */}
+      {visible.map((v) =>
+        v.id === selectedChurchId ? null : (
+          <circle
+            key={v.id}
+            data-id={v.id}
+            cx={v.x}
+            cy={v.y}
+            r={v.r / zoom}
+            fill={v.color}
+            fillOpacity={0.8}
+            stroke="rgba(255,255,255,0.6)"
+            strokeWidth={0.8 / zoom}
+            style={{ cursor: "pointer" }}
+          />
+        )
+      )}
+
+      {/* Selected church — always rendered on top */}
+      {selectedEntry && (
+        <circle
+          data-id={selectedEntry.id}
+          cx={selectedEntry.x}
+          cy={selectedEntry.y}
+          r={(selectedEntry.r * 1.6) / zoom}
+          fill="#fff"
+          fillOpacity={1}
+          stroke={selectedEntry.color}
+          strokeWidth={2.5 / zoom}
+          style={{ cursor: "pointer" }}
+        />
+      )}
+    </g>
+  );
+});
