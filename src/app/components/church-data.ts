@@ -70,12 +70,10 @@ export const DENOMINATION_GROUPS: { label: string; matches: string[] }[] = [
   { label: "Episcopal", matches: ["Episcopal", "Anglican"] },
   { label: "Pentecostal", matches: ["Pentecostal", "Foursquare"] },
   { label: "Assemblies of God", matches: ["Assemblies of God"] },
-  { label: "Latter-day Saints", matches: ["Latter-day Saints"] },
   { label: "Church of Christ", matches: ["Church of Christ"] },
   { label: "Church of God", matches: ["Church of God"] },
   { label: "Orthodox", matches: ["Orthodox", "Coptic", "Antiochian"] },
   { label: "Seventh-day Adventist", matches: ["Seventh-day Adventist"] },
-  { label: "Jehovah's Witnesses", matches: ["Jehovah"] },
   { label: "Evangelical", matches: ["Evangelical", "Alliance", "Moravian"] },
   { label: "Nazarene", matches: ["Nazarene"] },
   { label: "Congregational", matches: ["Congregational"] },
@@ -85,9 +83,7 @@ export const DENOMINATION_GROUPS: { label: string; matches: string[] }[] = [
   { label: "Reformed", matches: ["Reformed"] },
   { label: "Quaker", matches: ["Quaker", "Friends"] },
   { label: "Covenant", matches: ["Covenant"] },
-  { label: "Unitarian", matches: ["Unitarian", "Universalist"] },
   { label: "Salvation Army", matches: ["Salvation Army"] },
-  { label: "Christian Science", matches: ["Christian Science", "Scientist"] },
   { label: "Non-denominational", matches: ["Non-denominational", "Nondenominational", "Non denominational"] },
   { label: "Unspecified", matches: ["Other", "Unknown"] }, // catch-all
 ];

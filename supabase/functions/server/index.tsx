@@ -85,6 +85,39 @@ function normD(tags:Record<string,string>):string{
 
 const DMED:Record<string,number>={"Catholic":800,"Baptist":85,"Methodist":70,"Lutheran":75,"Presbyterian":75,"Episcopal":60,"Pentecostal":75,"Assemblies of God":100,"Non-denominational":120,"Latter-day Saints":180,"Church of Christ":65,"Church of God":70,"Orthodox":60,"Seventh-day Adventist":55,"Evangelical":100,"Jehovah's Witnesses":70,"Nazarene":65,"Congregational":55,"Mennonite":55,"Amish":80,"Reformed":75,"Salvation Army":35,"Christian Science":25,"Unitarian":50,"Quaker":25,"Covenant":80,"Disciples of Christ":70};
 const ARDA:Record<string,number>={"Catholic":849,"Baptist":119,"Methodist":54,"Lutheran":66,"Presbyterian":59,"Episcopal":54,"Pentecostal":79,"Assemblies of God":106,"Non-denominational":143,"Latter-day Saints":173,"Church of Christ":66,"Church of God":70,"Orthodox":60,"Seventh-day Adventist":75,"Evangelical":84,"Jehovah's Witnesses":62,"Nazarene":52,"Congregational":36,"Mennonite":66,"Amish":88,"Reformed":63,"Salvation Army":30,"Christian Science":21,"Unitarian":44,"Quaker":22,"Covenant":75,"Disciples of Christ":36};
+
+// ── Blocked denominations (fully excluded) ──
+const BLOCKED_DENOMINATIONS_CANONICAL=new Set<string>([
+  "Latter-day Saints",
+  "Jehovah's Witnesses",
+  "Unitarian",
+  "Christian Science",
+]);
+
+const BLOCKED_DENOMINATION_KEYWORDS=[
+  "latter-day saints",
+  "latter day saints",
+  "church of jesus christ of latter-day saints",
+  "lds",
+  "mormon",
+  "mormons",
+  "jehovah's witnesses",
+  "jehovahs witnesses",
+  "unitarian",
+  "unitarian universalist",
+  "universalist unitarian",
+  "christian science",
+  "church of christ, scientist",
+];
+
+function isBlockedDenomination(denomination:string|undefined|null):boolean{
+  if(!denomination)return false;
+  const v=denomination.trim();
+  if(!v)return false;
+  if(BLOCKED_DENOMINATIONS_CANONICAL.has(v))return true;
+  const l=v.toLowerCase();
+  return BLOCKED_DENOMINATION_KEYWORDS.some(k=>l.includes(k));
+}
 const POP:Record<string,number>={AL:5108468,AK:733406,AZ:7431344,AR:3067732,CA:38965193,CO:5877610,CT:3617176,DE:1031890,FL:22610726,GA:11029227,HI:1435138,ID:1964726,IL:12549689,IN:6862199,IA:3207004,KS:2940546,KY:4526154,LA:4573749,ME:1395722,MD:6859225,MA:7001399,MI:10037261,MN:5737915,MS:2939690,MO:6196156,MT:1132812,NE:1978379,NV:3194176,NH:1402054,NJ:9290841,NM:2114371,NY:19571216,NC:10835491,ND:783926,OH:11785935,OK:4053824,OR:4233358,PA:12961683,RI:1095962,SC:5373555,SD:919318,TN:7126489,TX:30503301,UT:3417734,VT:647464,VA:8683619,WA:7812880,WV:1770071,WI:5910955,WY:584057};
 
 function refARDA(d:string,est:number):number{const a=ARDA[d];if(!a)return est;const b=Math.round(est*0.7+a*0.3);return Math.max(10,Math.min(Math.max(Math.round(est*0.5),b),Math.round(est*1.5)));}
@@ -157,7 +190,9 @@ function parse(els:any[],st:string):any[]{
     if(!lat||!lng)return null;
     if(b){const[s,w,n,e]=b;if(lat<s-0.01||lat>n+0.01||lng<w-0.01||lng>e+0.01)return null;}
     const t=el.tags||{};
-    return{id:`${st}-${el.id||i}`,name:t.name||t["name:en"]||"Unnamed Church",lat,lng,denomination:normD(t),attendance:estA(t,el.id,el.type),state:st.toUpperCase(),city:city(t),address:t["addr:street"]?`${t["addr:housenumber"]||""} ${t["addr:street"]}`.trim():"",website:t.website||t["contact:website"]||""};
+    const denomination=normD(t);
+    if(isBlockedDenomination(denomination))return null;
+    return{id:`${st}-${el.id||i}`,name:t.name||t["name:en"]||"Unnamed Church",lat,lng,denomination,attendance:estA(t,el.id,el.type),state:st.toUpperCase(),city:city(t),address:t["addr:street"]?`${t["addr:housenumber"]||""} ${t["addr:street"]}`.trim():"",website:t.website||t["contact:website"]||""};
   }).filter(Boolean);
 }
 
@@ -313,6 +348,31 @@ app.post(`${P}/admin/cleanup-dc`,async(c)=>{
   }catch(e){return c.json({error:`${e}`},500);}
 });
 
+app.post(`${P}/admin/cleanup-blocked-denominations`,async(c)=>{
+  try{
+    const meta=await kv.get("churches:meta");const sc:Record<string,number>={...(meta?.stateCounts||{})};
+    const states=Object.keys(sc);
+    if(!states.length)return c.json({message:"No states populated.",cleaned:0});
+    let cleanedStates=0,removedTotal=0;
+    for(const st of states){
+      const key=`churches:${st}`;
+      const ch=await kv.get(key);
+      if(!Array.isArray(ch)||!ch.length)continue;
+      const filtered=ch.filter((x:any)=>!isBlockedDenomination(x.denomination));
+      const removed=ch.length-filtered.length;
+      if(removed>0){
+        await kv.set(key,filtered);
+        await writeIdx(st,filtered);
+        sc[st]=filtered.length;
+        removedTotal+=removed;
+        cleanedStates++;
+      }
+    }
+    if(meta){meta.stateCounts=sc;meta.lastBlockedCleanup=new Date().toISOString();await kv.set("churches:meta",meta);}
+    return c.json({message:`Cleanup complete. Removed ${removedTotal} churches across ${cleanedStates} states.`,removed:removedTotal,states:cleanedStates});
+  }catch(e){return c.json({error:`${e}`},500);}
+});
+
 // ── Community routes ──
 const THR=3;
 function cip(c:any):string{return c.req.header("x-forwarded-for")?.split(",")[0]?.trim()||c.req.header("x-real-ip")||"unknown";}
@@ -337,6 +397,7 @@ app.post(`${P}/suggestions`,async(c)=>{
     const ip=cip(c);const{churchId,field,value}=await c.req.json();
     if(!churchId||!field||!value)return c.json({error:"Missing fields"},400);
     if(!VF.includes(field))return c.json({error:"Invalid field"},400);
+    if(field==="denomination"&&isBlockedDenomination(String(value)))return c.json({error:"Denomination not supported"},400);
     if(field==="attendance"){const n=parseInt(value);if(isNaN(n)||n<1||n>50000)return c.json({error:"Attendance 1-50000"},400);}
     const k=`suggestions:${churchId}`;const ex=(await kv.get(k))||{churchId,submissions:[]};
     // Ensure churchId is stored in the value for getByPrefix lookups
@@ -412,11 +473,13 @@ app.post(`${P}/churches/add`,async(c)=>{
     const pLat=parseFloat(lat),pLng=parseFloat(lng);
     if(isNaN(pLat)||isNaN(pLng)||pLat<18||pLat>72||pLng<-180||pLng>-65)return c.json({error:"Valid US coords required"},400);
     const att=Math.max(1,Math.min(parseInt(attendance)||50,50000));
+    const rawDenom=(denomination??"").trim();
+    if(rawDenom&&isBlockedDenomination(rawDenom))return c.json({error:"Denomination not supported"},400);
     const id=`community-${st}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
     const k=`pending-churches:${st}`;const store=(await kv.get(k))||{churches:[]};
     const dup=store.churches.find((ch:any)=>ch.name.trim().toLowerCase()===name.trim().toLowerCase()&&Math.abs(ch.lat-pLat)<0.001&&Math.abs(ch.lng-pLng)<0.001);
     if(dup){if(!dup.verifications.some((v:any)=>v.ip===ip)){dup.verifications.push({ip,timestamp:Date.now()});if(dup.verifications.length>=THR)dup.approved=true;await kv.set(k,store);}return c.json({success:true,church:dup,isDuplicate:true});}
-    const nc={id,name:name.trim(),address:(addr||"").trim(),city:(ci||"").trim(),state:st,lat:pLat,lng:pLng,denomination:(denomination||"Unknown").trim(),attendance:att,website:(website||"").trim(),serviceTimes:(serviceTimes||"").trim()||undefined,languages:Array.isArray(languages)&&languages.length?languages:undefined,ministries:Array.isArray(ministries)&&ministries.length?ministries:undefined,pastorName:(pastorName||"").trim()||undefined,phone:(phone||"").trim()||undefined,email:(email||"").trim()||undefined,submittedByIp:ip,submittedAt:Date.now(),approved:false,verifications:[{ip,timestamp:Date.now()}]};
+    const nc={id,name:name.trim(),address:(addr||"").trim(),city:(ci||"").trim(),state:st,lat:pLat,lng:pLng,denomination:(rawDenom||"Unknown"),attendance:att,website:(website||"").trim(),serviceTimes:(serviceTimes||"").trim()||undefined,languages:Array.isArray(languages)&&languages.length?languages:undefined,ministries:Array.isArray(ministries)&&ministries.length?ministries:undefined,pastorName:(pastorName||"").trim()||undefined,phone:(phone||"").trim()||undefined,email:(email||"").trim()||undefined,submittedByIp:ip,submittedAt:Date.now(),approved:false,verifications:[{ip,timestamp:Date.now()}]};
     store.churches.push(nc);await kv.set(k,store);
     return c.json({success:true,church:nc});
   }catch(e){return c.json({error:`${e}`},500);}
