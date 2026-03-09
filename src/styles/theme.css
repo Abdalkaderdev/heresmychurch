@@ -126,12 +126,17 @@
 
   body {
     @apply bg-background text-foreground;
+    overflow: hidden;
   }
 
   /**
   * Default typography styles for HTML elements (h1-h4, p, label, button, input).
   * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
   */
+
+  html, body, #root {
+    height: 100%;
+  }
 
   html {
     font-size: var(--font-size);
@@ -184,4 +189,9 @@
 /* react-simple-maps: ensure pointer cursor on clickable map states */
 .rsm-geography {
   cursor: pointer;
+}
+
+/* Smooth fly-in/fly-out transitions for programmatic map view changes */
+.map-transitioning .rsm-zoomable-group {
+  transition: transform 800ms cubic-bezier(0.25, 0.1, 0.25, 1);
 }

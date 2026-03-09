@@ -108,6 +108,7 @@ export function useChurchMapData({
     prevRouteChurch: null as string | null,
     statesLoaded: false,
     moveEndSuppressedUntil: 0,
+    transitionVersion: 0,
   });
 
   // Keep ref in sync (no useEffect needed — direct assignment every render)
@@ -116,9 +117,16 @@ export function useChurchMapData({
 
   // ── moveToView helper (replaces old useCallback from useMapView) ──
   const moveToView = (targetCenter: [number, number], targetZoom: number) => {
-    refs.current.moveEndSuppressedUntil = Date.now() + 900;
+    refs.current.moveEndSuppressedUntil = Date.now() + 1100;
+    const version = ++refs.current.transitionVersion;
+    dd({ type: "SET_TRANSITIONING", value: true });
     setCenter(targetCenter);
     setZoom(targetZoom);
+    setTimeout(() => {
+      if (refs.current.transitionVersion === version) {
+        dd({ type: "SET_TRANSITIONING", value: false });
+      }
+    }, 850);
   };
 
   const allStatesLoaded = useMemo(
@@ -484,20 +492,25 @@ export function useChurchMapData({
 
     if (!routeStateAbbrev) {
       refs.current.loadVersion++;
+      const version = ++refs.current.transitionVersion;
+      dd({ type: "SET_TRANSITIONING", value: true });
       dd({ type: "RESET_TO_NATIONAL" });
       ui.setShowFilterPanel(false);
       ui.setShowListModal(false);
       ui.setLanguageFilter("all");
       overlay.setForceLoadingVisible(false);
       refs.current.pendingTransition = null;
-      refs.current.moveEndSuppressedUntil = Date.now() + 900;
-      // Safety net: re-assert national view after ZoomableGroup animation settles
+      refs.current.moveEndSuppressedUntil = Date.now() + 1100;
+      // Safety net: re-assert national view after CSS transition settles
       setTimeout(() => {
+        if (refs.current.transitionVersion === version) {
+          dd({ type: "SET_TRANSITIONING", value: false });
+        }
         if (!refs.current.focusedState) {
           dd({ type: "SET_CENTER", value: [-96, 38] as [number, number] });
           dd({ type: "SET_ZOOM", value: 1 });
         }
-      }, 1000);
+      }, 1050);
       return;
     }
 
@@ -589,6 +602,7 @@ export function useChurchMapData({
     }
   };
 
+  const clearTransition = () => dd({ type: "SET_TRANSITIONING", value: false });
   const handleResetView = () => navigateToNational();
   const handleZoomIn = () => setZoom((z) => Math.min(z * 1.5, 120));
   const handleZoomOut = () => setZoom((z) => Math.max(z / 1.5, 1));
@@ -605,6 +619,8 @@ export function useChurchMapData({
     // Map state (was in useMapView, now in data reducer)
     zoom, setZoom,
     center, setCenter,
+    isTransitioning: ds.isTransitioning,
+    clearTransition,
     moveEndSuppressedUntilRef: refs as { current: { moveEndSuppressedUntil: number } },
     // Data
     states,
@@ -690,6 +706,7 @@ type DataState = {
   loadingStateName: string;
   zoom: number;
   center: [number, number];
+  isTransitioning: boolean;
 };
 
 type DataAction =
@@ -707,6 +724,7 @@ type DataAction =
   | { type: "SET_LOADING_STATE_NAME"; value: string }
   | { type: "SET_ZOOM"; value: number | ((p: number) => number) }
   | { type: "SET_CENTER"; value: [number, number] }
+  | { type: "SET_TRANSITIONING"; value: boolean }
   | { type: "RESET_TO_NATIONAL" };
 
 const initialDataState: DataState = {
@@ -724,6 +742,7 @@ const initialDataState: DataState = {
   loadingStateName: "",
   zoom: 1,
   center: [-96, 38] as [number, number],
+  isTransitioning: false,
 };
 
 function dataReducer(state: DataState, action: DataAction): DataState {
@@ -768,6 +787,8 @@ function dataReducer(state: DataState, action: DataAction): DataState {
       };
     case "SET_CENTER":
       return { ...state, center: action.value };
+    case "SET_TRANSITIONING":
+      return state.isTransitioning === action.value ? state : { ...state, isTransitioning: action.value };
     case "RESET_TO_NATIONAL":
       return {
         ...state,

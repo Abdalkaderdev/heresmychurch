@@ -366,6 +366,8 @@ function MapArea({
         onStateHover={d.setHoveredState}
         onChurchClick={d.handleChurchDotClick}
         onChurchHover={d.setHoveredChurch}
+        isTransitioning={d.isTransitioning}
+        onUserInteractionStart={d.clearTransition}
       />
 
       {/* Tooltips */}

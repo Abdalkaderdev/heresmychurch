@@ -34,6 +34,8 @@ interface MapCanvasProps {
   onStateHover: (abbrev: string | null) => void;
   onChurchClick: (church: Church) => void;
   onChurchHover: (church: Church | null) => void;
+  isTransitioning: boolean;
+  onUserInteractionStart?: () => void;
 }
 
 export const MapCanvas = memo(function MapCanvas({
@@ -50,8 +52,11 @@ export const MapCanvas = memo(function MapCanvas({
   onStateHover,
   onChurchClick,
   onChurchHover,
+  isTransitioning,
+  onUserInteractionStart,
 }: MapCanvasProps) {
   return (
+    <div className={isTransitioning ? 'map-transitioning' : ''} style={{ width: '100%', height: '100%' }}>
     <ComposableMap
       projection="geoAlbersUsa"
       style={{ width: "100%", height: "100%" }}
@@ -62,6 +67,7 @@ export const MapCanvas = memo(function MapCanvas({
         zoom={zoom}
         minZoom={1}
         maxZoom={120}
+        onMoveStart={() => { if (onUserInteractionStart) onUserInteractionStart(); }}
         onMoveEnd={({ coordinates, zoom: z }: { coordinates: [number, number]; zoom: number }) => {
           if (coordinates && coordinates[0] != null && coordinates[1] != null) {
             onMoveEnd(coordinates, z);
@@ -102,6 +108,7 @@ export const MapCanvas = memo(function MapCanvas({
         )}
       </ZoomableGroup>
     </ComposableMap>
+    </div>
   );
 });
 
