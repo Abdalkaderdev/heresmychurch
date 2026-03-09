@@ -68,7 +68,6 @@ npm run dev
 ## Credits
 
 - [shadcn/ui](https://ui.shadcn.com) — MIT licensed component library
-- [Unsplash](https://unsplash.com) — photos used under [Unsplash license](https://unsplash.com/license)
 - Originally built with [Figma Make](https://www.figma.com/make) — the [original project](https://www.figma.com/design/DDx89YVARqkAInuPhDGvFY/Here-s-My-Church)
 
 ## License
