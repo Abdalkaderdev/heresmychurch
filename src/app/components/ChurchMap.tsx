@@ -583,7 +583,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
         <div className="px-6 py-5 overflow-y-auto flex-1 min-h-0">
           <div className="flex items-center justify-center gap-2 mb-4 px-3 py-2 rounded-lg bg-white/5">
             <span className="text-purple-300 text-xs">{"\u2726"}</span>
-            <p className="text-white/60 text-xs text-balance">100% free and open-source</p>
+            <p className="text-white/60 text-xs text-balance">100% free and crowd-sourced</p>
           </div>
           <p className="text-white/40 text-[11px] uppercase tracking-wider font-medium mb-3">What you can do</p>
           <ul className="space-y-2.5">
