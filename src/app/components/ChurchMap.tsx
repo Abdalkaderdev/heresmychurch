@@ -25,6 +25,8 @@ import {
 import { useChurchMapData } from "./useChurchMapData";
 import { useCallback } from "react";
 
+/* eslint-disable @refresh/only-export-components -- force clean re-mount after hook changes */
+
 interface ChurchMapProps {
   routeStateAbbrev: string | null;
   routeChurchId: string | null;
@@ -61,9 +63,11 @@ export function ChurchMap({
   }, [d.setShowSummary, d.setShowFilterPanel, d.setShowLegend, d.setSearchCollapsed]);
 
   const handleMoveEnd = useCallback((coords: [number, number], z: number) => {
+    // Skip stale onMoveEnd events fired by ZoomableGroup after a programmatic view change
+    if (Date.now() < d.moveEndSuppressedUntilRef.current) return;
     d.setCenter(coords);
     d.setZoom(z);
-  }, [d.setCenter, d.setZoom]);
+  }, [d.setCenter, d.setZoom, d.moveEndSuppressedUntilRef]);
 
   return (
     <div
@@ -150,8 +154,8 @@ function MapArea({
 }) {
   return (
     <div className={`${d.selectedChurch ? 'h-[45vh] md:h-full md:flex-1' : 'flex-1'} relative`} style={{ backgroundColor: "#F5F0E8" }}>
-      {/* Top header pill + summary dropdown */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center max-w-[90vw] md:max-w-[75vw]" ref={d.summaryRef}>
+      {/* Top header pill + summary dropdown — pushed down on mobile when back button is visible */}
+      <div className={`absolute left-1/2 -translate-x-1/2 z-30 flex flex-col items-center max-w-[90vw] md:max-w-[75vw] ${d.focusedState ? 'top-16 md:top-4' : 'top-4'}`} ref={d.summaryRef}>
         <HeaderPill
           focusedState={d.focusedState}
           focusedStateName={d.focusedStateName}

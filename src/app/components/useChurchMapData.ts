@@ -112,6 +112,9 @@ export function useChurchMapData({
   // Point-in-polygon filtering: actual state boundary from topojson
   const stateFeaturesRef = useRef<Map<string, any>>(new Map());
 
+  // In-memory session cache: stateAbbrev -> filtered Church[]
+  const churchCacheRef = useRef<Map<string, Church[]>>(new Map());
+
   // Bible saying cycling for loading states
   const MIN_VERSES = 3;
   const [sayingIndex, setSayingIndex] = useState<number | null>(null);
@@ -123,8 +126,12 @@ export function useChurchMapData({
   useEffect(() => { loadingRef.current = loading; }, [loading]);
   useEffect(() => { populatingRef.current = populating; }, [populating]);
 
+  // Guard: suppress onMoveEnd briefly after programmatic view changes
+  const moveEndSuppressedUntilRef = useRef(0);
+
   // Smooth zoom
   const moveToView = useCallback((targetCenter: [number, number], targetZoom: number) => {
+    moveEndSuppressedUntilRef.current = Date.now() + 400; // ignore onMoveEnd for 400ms
     setCenter(targetCenter);
     setZoom(targetZoom);
   }, []);
@@ -221,6 +228,9 @@ export function useChurchMapData({
   // Sync local state churchCount with actual polygon-filtered count
   useEffect(() => {
     if (focusedState && churches.length > 0) {
+      // Update session cache whenever we have final church data for a state
+      churchCacheRef.current.set(focusedState, churches);
+
       setStates(prev => {
         const existing = prev.find(s => s.abbrev === focusedState);
         if (existing && existing.churchCount !== churches.length) {
@@ -371,6 +381,25 @@ export function useChurchMapData({
       const stateInfo = states.find((s) => s.abbrev === stateAbbrev);
       if (!stateInfo) {
         console.error(`[ChurchMap] loadStateData: no stateInfo found for "${stateAbbrev}"`);
+        return;
+      }
+
+      // ── Session cache hit: instant revisit ──
+      const cached = churchCacheRef.current.get(stateAbbrev);
+      if (cached && cached.length > 0) {
+        console.log(`[ChurchMap] Cache hit for ${stateAbbrev} (${cached.length} churches) — instant load`);
+        loadVersionRef.current++;
+        setFocusedState(stateAbbrev);
+        setFocusedStateName(stateInfo.name);
+        setChurches(cached);
+        setSelectedChurch(null);
+        setError(null);
+        setLoading(false);
+        setPopulating(false);
+        pendingTransitionRef.current = null;
+        setLoadingStateName("");
+        setForceLoadingVisible(false);
+        moveToView([stateInfo.lng, stateInfo.lat], getStateZoom(stateAbbrev));
         return;
       }
 
@@ -771,6 +800,8 @@ export function useChurchMapData({
     statePopulations,
     // Loading overlay
     sayingIndex, forceLoadingVisible, loadingStateName,
+    // Move-end suppression guard (for race-condition prevention)
+    moveEndSuppressedUntilRef,
     // Computed
     filteredChurches, languageStats, denomCounts, sizeCounts, summaryStats,
     // Actions
