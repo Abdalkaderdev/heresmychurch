@@ -27,6 +27,7 @@ import { ServiceTimesInput } from "./ServiceTimesInput";
 interface SuggestEditFormProps {
   church: Church;
   onClose: () => void;
+  focusField?: string | null;
 }
 
 type EditableField = "website" | "address" | "attendance" | "denomination" | "serviceTimes" | "languages" | "ministries" | "pastorName" | "phone" | "email";
@@ -83,7 +84,7 @@ function getCurrentValue(church: Church, field: EditableField): string {
   }
 }
 
-export function SuggestEditForm({ church, onClose }: SuggestEditFormProps) {
+export function SuggestEditForm({ church, onClose, focusField }: SuggestEditFormProps) {
   const [consensus, setConsensus] = useState<Record<string, SuggestionConsensus> | null>(null);
   const [myVotes, setMyVotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -121,6 +122,17 @@ export function SuggestEditForm({ church, onClose }: SuggestEditFormProps) {
   useEffect(() => {
     loadSuggestions();
   }, [loadSuggestions]);
+
+  // Auto-focus on a specific field when focusField prop is set
+  useEffect(() => {
+    if (focusField && !loading) {
+      setEditingFields(new Set([focusField]));
+      setValues(v => ({ ...v, [focusField]: getCurrentValue(church, focusField as EditableField) }));
+      setTimeout(() => {
+        document.getElementById(`field-${focusField}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    }
+  }, [focusField, loading]);
 
   const handleSubmit = async (field: EditableField, value?: string) => {
     const val = (value ?? values[field])?.trim();
@@ -361,6 +373,7 @@ function FieldCard({
 
   return (
     <div
+      id={`field-${key}`}
       className={`rounded-xl p-3.5 border transition-colors ${
         empty
           ? "bg-pink-500/5 border-pink-500/15"

@@ -19,6 +19,7 @@ export interface Church {
   phone?: string;
   email?: string;
   bilingualProbability?: number; // 0-1, estimated or user-confirmed
+  lastVerified?: number; // timestamp of last correction or confirmation
 }
 
 export interface StateInfo {

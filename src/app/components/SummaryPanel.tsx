@@ -10,10 +10,14 @@ import {
   BarChart3,
   MapPin,
   ShieldCheck,
+  Check,
   type LucideIcon,
 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { sizeCategories } from "./church-data";
 import type { StateInfo } from "./church-data";
+import { fetchCommunityStats } from "./api";
+import type { CommunityStats } from "./api";
 
 type InterestingFact = {
   icon: string;
@@ -193,6 +197,9 @@ function StateSummaryContent({
         )}
       </p>
 
+      {/* Community impact */}
+      <CommunityStatsCard />
+
       {/* Interesting facts */}
       <FactsList facts={stats.interestingFacts} />
 
@@ -328,6 +335,42 @@ function NationalSummaryContent({
         </div>
       )}
     </>
+  );
+}
+
+function CommunityStatsCard() {
+  const [stats, setStats] = useState<CommunityStats | null>(null);
+  useEffect(() => {
+    fetchCommunityStats().then(setStats).catch(() => {});
+  }, []);
+  if (!stats || (stats.totalCorrections === 0 && stats.totalConfirmations === 0)) return null;
+  return (
+    <div className="rounded-lg bg-green-500/5 border border-green-500/10 px-3 py-2.5">
+      <div className="flex items-center gap-2 mb-1.5">
+        <ShieldCheck size={12} className="text-green-400" />
+        <span className="text-[10px] uppercase tracking-wider text-green-400/70 font-bold">Community Impact</span>
+      </div>
+      <div className="flex items-center gap-3 text-[11px]">
+        {stats.totalCorrections > 0 && (
+          <span className="flex items-center gap-1 text-white/50">
+            <Check size={9} className="text-green-400/60" />
+            <span className="text-white/70 font-medium">{stats.totalCorrections}</span> corrections
+          </span>
+        )}
+        {stats.churchesImproved > 0 && (
+          <span className="flex items-center gap-1 text-white/50">
+            <ChurchIcon size={9} className="text-green-400/60" />
+            <span className="text-white/70 font-medium">{stats.churchesImproved}</span> churches improved
+          </span>
+        )}
+        {stats.totalConfirmations > 0 && (
+          <span className="flex items-center gap-1 text-white/50">
+            <ShieldCheck size={9} className="text-green-400/60" />
+            <span className="text-white/70 font-medium">{stats.totalConfirmations}</span> confirmed
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 

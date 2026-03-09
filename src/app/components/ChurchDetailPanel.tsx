@@ -23,6 +23,8 @@ import {
 import { useState, useMemo, useEffect, useRef } from "react";
 import { SuggestEditForm } from "./SuggestEditForm";
 import { groupServiceTimesByDay, parseServiceTimesForDisplay } from "./ServiceTimesInput";
+import { confirmChurchData, fetchCorrectionHistory } from "./api";
+import type { CorrectionHistoryEntry } from "./api";
 
 interface ChurchDetailPanelProps {
   church: Church;
@@ -33,6 +35,19 @@ interface ChurchDetailPanelProps {
   onReviewCorrections?: () => void;
   externalShowEditForm?: boolean;
   onEditFormClosed?: () => void;
+}
+
+function formatTimeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
 }
 
 // Haversine distance in miles
@@ -194,6 +209,10 @@ export function ChurchDetailPanel({
 }: ChurchDetailPanelProps) {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [editFocusField, setEditFocusField] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [correctionHistory, setCorrectionHistory] = useState<CorrectionHistoryEntry[]>([]);
   const sizeCat = getSizeCategory(church.attendance);
   const denomGroup = getDenominationGroup(church.denomination);
   const bilingualInfo = estimateBilingualProbability(church);
@@ -258,11 +277,39 @@ export function ChurchDetailPanel({
     }
   }, [externalShowEditForm]);
 
+  // Fetch correction history
+  useEffect(() => {
+    setCorrectionHistory([]);
+    setConfirmed(false);
+    fetchCorrectionHistory(church.id)
+      .then((data) => setCorrectionHistory(data.history))
+      .catch(() => {});
+  }, [church.id]);
+
+  const handleConfirmData = async () => {
+    setConfirming(true);
+    try {
+      await confirmChurchData(church.id);
+      setConfirmed(true);
+      setTimeout(() => setConfirmed(false), 3000);
+    } catch (err) {
+      console.error("Failed to confirm:", err);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const openEditForField = (field: string) => {
+    setEditFocusField(field);
+    setShowEditForm(true);
+  };
+
   if (showEditForm) {
     return (
       <SuggestEditForm
         church={church}
-        onClose={() => setShowEditForm(false)}
+        onClose={() => { setShowEditForm(false); setEditFocusField(null); }}
+        focusField={editFocusField}
       />
     );
   }
@@ -345,12 +392,13 @@ export function ChurchDetailPanel({
         {/* Stats cards */}
         <div className="grid grid-cols-2 gap-3">
           {/* Attendance */}
-          <div className="rounded-xl p-3.5 bg-white/5 border border-white/5">
+          <div className="rounded-xl p-3.5 bg-white/5 border border-white/5 group/card">
             <div className="flex items-center gap-2 mb-2">
               <Users size={14} className="text-purple-400" />
               <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">
                 Est. Avg. Weekly Attendance
               </span>
+              <button onClick={() => openEditForField("attendance")} className="ml-auto p-1 rounded hover:bg-white/10 transition-colors opacity-0 group-hover/card:opacity-100"><Pencil size={9} className="text-white/30" /></button>
             </div>
             <div className="text-white text-xl font-bold">
               ~{church.attendance.toLocaleString()}
@@ -367,12 +415,13 @@ export function ChurchDetailPanel({
           </div>
 
           {/* Denomination */}
-          <div className="rounded-xl p-3.5 bg-white/5 border border-white/5">
+          <div className="rounded-xl p-3.5 bg-white/5 border border-white/5 group/card">
             <div className="flex items-center gap-2 mb-2">
               <ChurchIcon size={14} className="text-purple-400" />
               <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">
                 Denomination
               </span>
+              <button onClick={() => openEditForField("denomination")} className="ml-auto p-1 rounded hover:bg-white/10 transition-colors opacity-0 group-hover/card:opacity-100"><Pencil size={9} className="text-white/30" /></button>
             </div>
             <div className="text-white text-sm font-bold leading-snug">
               {church.denomination === "Other" || church.denomination === "Unknown" ? "Unspecified" : church.denomination}
@@ -490,9 +539,30 @@ export function ChurchDetailPanel({
             </button>
           )}
 
+          {/* Data looks correct */}
+          <button
+            onClick={handleConfirmData}
+            disabled={confirming || confirmed}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-green-500/10 hover:bg-green-500/20 border border-green-500/15 transition-colors group disabled:opacity-70"
+          >
+            {confirmed ? (
+              <>
+                <Check size={13} className="text-green-400" />
+                <span className="text-green-400 text-xs font-semibold">Data confirmed, thank you!</span>
+              </>
+            ) : (
+              <>
+                <ShieldCheck size={13} className="text-green-400 group-hover:text-green-300 transition-colors" />
+                <span className="text-green-300 text-xs font-semibold group-hover:text-green-200 transition-colors">
+                  Data looks correct
+                </span>
+              </>
+            )}
+          </button>
+
           {/* Suggest a Correction */}
           <button
-            onClick={() => setShowEditForm(true)}
+            onClick={() => { setEditFocusField(null); setShowEditForm(true); }}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/20 transition-colors group"
           >
             <Pencil size={13} className="text-purple-400 group-hover:text-purple-300 transition-colors" />
@@ -523,6 +593,27 @@ export function ChurchDetailPanel({
                   {DENOMINATION_FACTS[denomGroup]}
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Recent Changes */}
+        {correctionHistory.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Clock size={13} className="text-purple-400" />
+              <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">
+                Recent Changes
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {correctionHistory.slice(0, 5).map((entry, i) => (
+                <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.03]">
+                  <Check size={10} className="text-green-400/60 flex-shrink-0" />
+                  <span className="text-white/50 text-[11px] font-medium capitalize">{entry.field === "serviceTimes" ? "Service Times" : entry.field === "pastorName" ? "Pastor" : entry.field}</span>
+                  <span className="text-white/30 text-[10px] ml-auto">{formatTimeAgo(entry.appliedAt)}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -578,6 +669,12 @@ export function ChurchDetailPanel({
             Data sourced from OpenStreetMap. Attendance figures are estimates
             based on capacity data and denomination averages.
           </p>
+          {church.lastVerified && (
+            <p className="text-white/30 text-[10px] mt-1 text-center flex items-center justify-center gap-1">
+              <ShieldCheck size={9} className="inline" />
+              Last verified {formatTimeAgo(church.lastVerified)}
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -424,6 +424,43 @@ export async function searchChurches(
   };
 }
 
+// ── Community stats & confirmation ──
+
+export interface CommunityStats {
+  totalCorrections: number;
+  churchesImproved: number;
+  totalConfirmations: number;
+  lastUpdated: number | null;
+}
+
+export interface CorrectionHistoryEntry {
+  churchId: string;
+  field: string;
+  value: string;
+  appliedAt: number;
+}
+
+export async function confirmChurchData(churchId: string): Promise<{ success: boolean; alreadyConfirmed?: boolean; totalConfirmations?: number }> {
+  const res = await fetchWithRetry(`${BASE_URL}/churches/confirm/${encodeURIComponent(churchId)}`, {
+    method: "POST",
+    headers,
+  });
+  if (!res.ok) throw new Error(`Failed to confirm: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchCommunityStats(): Promise<CommunityStats> {
+  const res = await fetchWithRetry(`${BASE_URL}/community/stats`, { headers });
+  if (!res.ok) throw new Error(`Failed to fetch stats: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchCorrectionHistory(churchId: string): Promise<{ churchId: string; history: CorrectionHistoryEntry[] }> {
+  const res = await fetchWithRetry(`${BASE_URL}/community/history/${encodeURIComponent(churchId)}`, { headers });
+  if (!res.ok) throw new Error(`Failed to fetch history: ${res.status}`);
+  return res.json();
+}
+
 export interface PopulationResponse {
   populations: Record<string, number>;
   source: string;

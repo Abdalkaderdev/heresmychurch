@@ -392,6 +392,39 @@ function consensus(subs:any[]){
   return res;
 }
 
+async function applyApprovedCorrections(churchId:string,con:Record<string,any>):Promise<boolean>{
+  const corrections:Record<string,any>={};
+  for(const[field,data]of Object.entries(con)){if((data as any).approved&&(data as any).value!==null)corrections[field]=(data as any).value;}
+  if(!Object.keys(corrections).length)return false;
+  const parts=churchId.split("-");const st=parts[0]==="community"?parts[1]:parts[0];
+  if(!st||st.length!==2)return false;
+  const key=`churches:${st}`;const churches=await kv.get(key);
+  if(!Array.isArray(churches))return false;
+  let updated=false;
+  for(const ch of churches){
+    if(ch.id===churchId){
+      for(const[f,v]of Object.entries(corrections)){
+        if(f==="attendance"){ch.attendance=parseInt(v)||ch.attendance;}
+        else if(f==="languages"||f==="ministries"){ch[f]=String(v).split(",").map((s:string)=>s.trim()).filter(Boolean);}
+        else{(ch as any)[f]=v;}
+      }
+      ch.lastVerified=Date.now();updated=true;break;
+    }
+  }
+  if(updated){
+    await kv.set(key,churches);await writeIdx(st,churches);
+    const statsKey="community:stats";const stats=(await kv.get(statsKey))||{totalCorrections:0,churchesImproved:[],totalConfirmations:0,corrections:[]};
+    const improved=Array.isArray(stats.churchesImproved)?stats.churchesImproved:[];
+    if(!improved.includes(churchId))improved.push(churchId);
+    stats.churchesImproved=improved;stats.totalCorrections=(stats.totalCorrections||0)+Object.keys(corrections).length;
+    const history=Array.isArray(stats.corrections)?stats.corrections:[];
+    for(const[f,v]of Object.entries(corrections))history.unshift({churchId,field:f,value:v,appliedAt:Date.now()});
+    stats.corrections=history.slice(0,500);stats.lastUpdated=Date.now();
+    await kv.set(statsKey,stats);
+  }
+  return updated;
+}
+
 app.post(`${P}/suggestions`,async(c)=>{
   try{
     const ip=cip(c);const{churchId,field,value}=await c.req.json();
@@ -405,7 +438,8 @@ app.post(`${P}/suggestions`,async(c)=>{
     const day=Date.now()-86400000;const r=ex.submissions.find((s:any)=>s.ip===ip&&s.field===field&&s.timestamp>day);
     if(r){r.value=String(value).trim();r.timestamp=Date.now();}else ex.submissions.push({ip,field,value:String(value).trim(),timestamp:Date.now()});
     await kv.set(k,ex);const con=consensus(ex.submissions);
-    return c.json({success:true,field,consensus:con[field],allFields:con});
+    const applied=await applyApprovedCorrections(churchId,con);
+    return c.json({success:true,field,consensus:con[field],allFields:con,applied});
   }catch(e){return c.json({error:`${e}`},500);}
 });
 
@@ -507,6 +541,40 @@ app.post(`${P}/churches/verify/:pendingId`,async(c)=>{
     await kv.set(k,store);
     return c.json({success:true,church:{...ch,verificationCount:ch.verifications.length,needed:THR,myVerification:true}});
   }catch(e){return c.json({error:`${e}`},500);}
+});
+
+// ── Confirm data & Community stats ──
+
+app.post(`${P}/churches/confirm/:churchId`,async(c)=>{
+  try{
+    const ip=cip(c);const churchId=c.req.param("churchId");
+    const parts=churchId.split("-");const st=parts[0]==="community"?parts[1]:parts[0];
+    if(!st||st.length!==2)return c.json({error:"Invalid church ID"},400);
+    const confirmKey=`confirms:${churchId}`;const existing=(await kv.get(confirmKey))||{confirmations:[]};
+    const day=Date.now()-86400000;
+    if(existing.confirmations.find((conf:any)=>conf.ip===ip&&conf.timestamp>day))return c.json({success:true,alreadyConfirmed:true});
+    existing.confirmations.push({ip,timestamp:Date.now()});await kv.set(confirmKey,existing);
+    const key=`churches:${st}`;const churches=await kv.get(key);
+    if(Array.isArray(churches)){const ch=churches.find((x:any)=>x.id===churchId);if(ch){ch.lastVerified=Date.now();await kv.set(key,churches);}}
+    const stats=(await kv.get("community:stats"))||{totalCorrections:0,churchesImproved:[],totalConfirmations:0,corrections:[]};
+    stats.totalConfirmations=(stats.totalConfirmations||0)+1;stats.lastUpdated=Date.now();await kv.set("community:stats",stats);
+    return c.json({success:true,totalConfirmations:existing.confirmations.length});
+  }catch(e){return c.json({error:`${e}`},500);}
+});
+
+app.get(`${P}/community/stats`,async(c)=>{
+  try{
+    const stats=(await kv.get("community:stats"))||{totalCorrections:0,churchesImproved:[],totalConfirmations:0,corrections:[],lastUpdated:null};
+    return c.json({totalCorrections:stats.totalCorrections||0,churchesImproved:Array.isArray(stats.churchesImproved)?stats.churchesImproved.length:0,totalConfirmations:stats.totalConfirmations||0,lastUpdated:stats.lastUpdated});
+  }catch(e){return c.json({totalCorrections:0,churchesImproved:0,totalConfirmations:0,error:`${e}`},500);}
+});
+
+app.get(`${P}/community/history/:churchId`,async(c)=>{
+  try{
+    const churchId=c.req.param("churchId");const stats=(await kv.get("community:stats"))||{corrections:[]};
+    const history=Array.isArray(stats.corrections)?stats.corrections.filter((h:any)=>h.churchId===churchId):[];
+    return c.json({churchId,history});
+  }catch(e){return c.json({churchId:c.req.param("churchId"),history:[],error:`${e}`},500);}
 });
 
 Deno.serve(app.fetch);
