@@ -190,6 +190,10 @@ export function ChurchMap({
           onOpenCorrections={() => {
             localDispatch({ type: "SET", key: "forceEditForm", value: true });
           }}
+          onAddChurch={() => {
+            localDispatch({ type: "SET", key: "showVerificationModal", value: false });
+            d.setShowAddChurchFromSummary(true);
+          }}
         />
       )}
 
