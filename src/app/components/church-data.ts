@@ -42,6 +42,43 @@ function isDenominationMissing(denomination: string | undefined): boolean {
   return !denomination || TIER1_DENOM_EMPTY_VALUES.includes(denomination.trim());
 }
 
+/** Placeholder service-time values that don't count as "has service times". */
+const TIER1_SERVICE_TIMES_EMPTY_VALUES = [
+  "",
+  "unknown",
+  "other",
+  "see website",
+  "tbd",
+  "n/a",
+  "na",
+  "pending",
+  "to be determined",
+];
+
+function isServiceTimesMissing(value: string | undefined): boolean {
+  if (!value) return true;
+  const normalized = value.trim().toLowerCase();
+  return TIER1_SERVICE_TIMES_EMPTY_VALUES.includes(normalized);
+}
+
+/** True if address is a real street-style address, not empty or only locality. */
+function isAddressMeaningful(
+  address: string | undefined,
+  city: string,
+  state: string
+): boolean {
+  if (!address || !address.trim()) return false;
+  const a = address.trim();
+  if (a.length < 5) return false;
+  const cityNorm = (city || "").trim().toLowerCase();
+  const stateNorm = (state || "").trim().toLowerCase();
+  const aNorm = a.toLowerCase();
+  if (cityNorm && aNorm === cityNorm) return false;
+  const cityState = [cityNorm, stateNorm].filter(Boolean).join(", ");
+  if (cityState && aNorm === cityState) return false;
+  return true;
+}
+
 export interface Tier1Completeness {
   missingAddress: boolean;
   missingServiceTimes: boolean;
@@ -55,8 +92,8 @@ export interface Tier1Completeness {
  * address, service times, denomination are missing (denom treated as missing if Unknown/Other).
  */
 export function getTier1Completeness(church: Church): Tier1Completeness {
-  const missingAddress = !church.address || !church.address.trim();
-  const missingServiceTimes = !church.serviceTimes || !church.serviceTimes.trim();
+  const missingAddress = !isAddressMeaningful(church.address, church.city, church.state);
+  const missingServiceTimes = isServiceTimesMissing(church.serviceTimes);
   const missingDenomination = isDenominationMissing(church.denomination);
   const missingCount = [missingAddress, missingServiceTimes, missingDenomination].filter(Boolean).length;
   return {
