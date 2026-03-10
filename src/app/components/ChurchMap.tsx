@@ -184,6 +184,7 @@ export function ChurchMap({
           stateAbbrev={d.focusedState}
           stateName={d.focusedStateName}
           churches={d.churches}
+          selectedChurch={d.selectedChurch}
           onClose={() => localDispatch({ type: "SET", key: "showVerificationModal", value: false })}
           onChurchClick={(church: Church) => {
             localDispatch({ type: "SET", key: "showVerificationModal", value: false });

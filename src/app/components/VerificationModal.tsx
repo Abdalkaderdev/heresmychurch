@@ -16,6 +16,8 @@ interface VerificationModalProps {
   stateAbbrev: string;
   stateName: string;
   churches: Church[];
+  /** When provided, use this church's data for stats when it appears in churches (e.g. after edit or detail load). */
+  selectedChurch?: Church | null;
   onClose: () => void;
   onChurchClick?: (church: Church) => void;
   filterChurchId?: string | null;
@@ -26,21 +28,28 @@ interface VerificationModalProps {
 export function VerificationModal({
   stateName,
   churches,
+  selectedChurch,
   onClose,
   onChurchClick,
   onAddChurch,
 }: VerificationModalProps) {
+  // Use best available data for stats: merge selectedChurch into list when it's in this state so percentages reflect edits/detail data
+  const churchesForStats = useMemo(() => {
+    if (!selectedChurch || !churches.some((c) => c.id === selectedChurch.id)) return churches;
+    return churches.map((ch) => (ch.id === selectedChurch.id ? selectedChurch : ch));
+  }, [churches, selectedChurch]);
+
   // Churches that need review: missing 2+ of address, service times, denomination
   const incompleteChurches = useMemo(() => churches.filter(churchNeedsReview), [churches]);
 
   const incompleteTotal = incompleteChurches.length;
 
-  // Percentages of state churches missing each core field (for stats row)
+  // Percentages of *all* state churches missing each core field (denominator = full list; use churchesForStats so selected church's real data counts)
   const coreStats = useMemo(() => {
-    const total = churches.length;
+    const total = churchesForStats.length;
     if (total === 0) return { total: 0, missingAddressPct: 0, missingServiceTimesPct: 0, missingDenominationPct: 0 };
     let missingAddress = 0, missingServiceTimes = 0, missingDenomination = 0;
-    for (const ch of churches) {
+    for (const ch of churchesForStats) {
       const t1 = getTier1Completeness(ch);
       if (t1.missingAddress) missingAddress++;
       if (t1.missingServiceTimes) missingServiceTimes++;
@@ -52,7 +61,7 @@ export function VerificationModal({
       missingServiceTimesPct: Math.round((missingServiceTimes / total) * 100),
       missingDenominationPct: Math.round((missingDenomination / total) * 100),
     };
-  }, [churches]);
+  }, [churchesForStats]);
 
   return (
     <div
