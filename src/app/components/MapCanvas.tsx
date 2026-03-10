@@ -18,7 +18,13 @@ import {
   FIPS_TO_STATE,
   STATE_TO_FIPS,
   getStateTier,
+  getCountyPerCapitaColor,
 } from "./map-constants";
+
+export type CountyStats = {
+  byFips: Record<string, { churchCount: number; population: number; perCapita: number; peoplePer: number; name: string }>;
+  sortedByPerCapita: Array<{ fips: string; name: string; churchCount: number; population: number; perCapita: number; peoplePer: number }>;
+};
 
 interface MapCanvasProps {
   center: [number, number];
@@ -36,6 +42,9 @@ interface MapCanvasProps {
   onChurchHover: (church: Church | null) => void;
   isTransitioning: boolean;
   onUserInteractionStart?: () => void;
+  countyStats: CountyStats | null;
+  hoveredCounty: string | null;
+  onCountyHover: (fips: string | null) => void;
 }
 
 export const MapCanvas = memo(function MapCanvas({
@@ -54,6 +63,9 @@ export const MapCanvas = memo(function MapCanvas({
   onChurchHover,
   isTransitioning,
   onUserInteractionStart,
+  countyStats,
+  hoveredCounty,
+  onCountyHover,
 }: MapCanvasProps) {
   return (
     <div className={isTransitioning ? 'map-transitioning' : ''} style={{ width: '100%', height: '100%' }}>
@@ -93,7 +105,12 @@ export const MapCanvas = memo(function MapCanvas({
         />
 
         {focusedState && (
-          <CountyGeographies focusedState={focusedState} />
+          <CountyGeographies
+            focusedState={focusedState}
+            countyStats={countyStats}
+            hoveredCounty={hoveredCounty}
+            onCountyHover={onCountyHover}
+          />
         )}
 
         {filteredChurches.length > 0 && (
@@ -176,11 +193,17 @@ const StateGeographies = memo(function StateGeographies({
   );
 });
 
-/* ── County boundaries ── */
+/* ── County boundaries (choropleth by churches per capita) ── */
 const CountyGeographies = memo(function CountyGeographies({
   focusedState,
+  countyStats,
+  hoveredCounty,
+  onCountyHover,
 }: {
   focusedState: string;
+  countyStats: CountyStats | null;
+  hoveredCounty: string | null;
+  onCountyHover: (fips: string | null) => void;
 }) {
   const stateFips = STATE_TO_FIPS[focusedState];
   if (!stateFips) return null;
@@ -190,21 +213,31 @@ const CountyGeographies = memo(function CountyGeographies({
       {({ geographies }: { geographies: any[] }) =>
         (geographies || [])
           .filter((geo) => String(geo.id).padStart(5, "0").substring(0, 2) === stateFips)
-          .map((geo) => (
-            <Geography
-              key={geo.rsmKey}
-              geography={geo}
-              fill="transparent"
-              stroke="rgba(107, 33, 168, 0.25)"
-              strokeWidth={0.4}
-              pointerEvents="none"
-              style={{
-                default: { outline: "none", cursor: "default" },
-                hover: { outline: "none", cursor: "default" },
-                pressed: { outline: "none", cursor: "default" },
-              }}
-            />
-          ))
+          .map((geo) => {
+            const fips = String(geo.id).padStart(5, "0");
+            const data = countyStats?.byFips[fips];
+            const fill = data
+              ? getCountyPerCapitaColor(data.perCapita, countyStats?.sortedByPerCapita ?? [])
+              : "rgba(255, 255, 255, 0.8)";
+            const isHovered = hoveredCounty === fips;
+            return (
+              <Geography
+                key={geo.rsmKey}
+                geography={geo}
+                fill={isHovered ? "#D4B8E8" : fill}
+                stroke={isHovered ? "rgba(107, 33, 168, 0.6)" : "rgba(107, 33, 168, 0.25)"}
+                strokeWidth={isHovered ? 0.8 : 0.4}
+                pointerEvents="auto"
+                onMouseEnter={() => onCountyHover(fips)}
+                onMouseLeave={() => onCountyHover(null)}
+                style={{
+                  default: { outline: "none", cursor: "pointer" },
+                  hover: { outline: "none", cursor: "pointer" },
+                  pressed: { outline: "none", cursor: "pointer" },
+                }}
+              />
+            );
+          })
       }
     </Geographies>
   );

@@ -7,6 +7,7 @@ import {
 interface UIState {
   hoveredChurch: any;
   hoveredState: string | null;
+  hoveredCounty: string | null;
   tooltipPos: { x: number; y: number };
   showFilterPanel: boolean;
   searchCollapsed: boolean;
@@ -25,6 +26,7 @@ interface UIState {
 type UIAction =
   | { type: "SET_HOVERED_CHURCH"; value: any }
   | { type: "SET_HOVERED_STATE"; value: string | null }
+  | { type: "SET_HOVERED_COUNTY"; value: string | null }
   | { type: "SET_TOOLTIP_POS"; value: { x: number; y: number } }
   | { type: "SET_SHOW_FILTER_PANEL"; value: boolean | ((prev: boolean) => boolean) }
   | { type: "SET_SEARCH_COLLAPSED"; value: boolean }
@@ -45,6 +47,8 @@ function uiReducer(state: UIState, action: UIAction): UIState {
       return state.hoveredChurch === action.value ? state : { ...state, hoveredChurch: action.value };
     case "SET_HOVERED_STATE":
       return state.hoveredState === action.value ? state : { ...state, hoveredState: action.value };
+    case "SET_HOVERED_COUNTY":
+      return state.hoveredCounty === action.value ? state : { ...state, hoveredCounty: action.value };
     case "SET_TOOLTIP_POS":
       return { ...state, tooltipPos: action.value };
     case "SET_SHOW_FILTER_PANEL": {
@@ -89,6 +93,7 @@ function uiReducer(state: UIState, action: UIAction): UIState {
 const initialUIState: UIState = {
   hoveredChurch: null,
   hoveredState: null,
+  hoveredCounty: null,
   tooltipPos: { x: 0, y: 0 },
   showFilterPanel: false,
   searchCollapsed: typeof window !== "undefined" && window.innerWidth < 768,
@@ -128,6 +133,7 @@ export function useUIState(focusedState: string | null) {
   // Plain setter functions — dispatch is guaranteed stable by React, so no useCallback needed
   const setHoveredChurch = (v: any) => dispatch({ type: "SET_HOVERED_CHURCH", value: v });
   const setHoveredState = (v: string | null) => dispatch({ type: "SET_HOVERED_STATE", value: v });
+  const setHoveredCounty = (v: string | null) => dispatch({ type: "SET_HOVERED_COUNTY", value: v });
   const setShowFilterPanel = (v: boolean | ((prev: boolean) => boolean)) => dispatch({ type: "SET_SHOW_FILTER_PANEL", value: v });
   const setSearchCollapsed = (v: boolean) => dispatch({ type: "SET_SEARCH_COLLAPSED", value: v });
   const setShowSizeFilters = (v: boolean) => dispatch({ type: "SET_SHOW_SIZE_FILTERS", value: v });
@@ -147,6 +153,7 @@ export function useUIState(focusedState: string | null) {
   return {
     hoveredChurch: s.hoveredChurch, setHoveredChurch,
     hoveredState: s.hoveredState, setHoveredState,
+    hoveredCounty: s.hoveredCounty, setHoveredCounty,
     tooltipPos: s.tooltipPos,
     showFilterPanel: s.showFilterPanel, setShowFilterPanel,
     searchCollapsed: s.searchCollapsed, setSearchCollapsed,

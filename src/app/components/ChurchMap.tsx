@@ -27,6 +27,7 @@ import {
   ErrorBanner,
   StateTooltip,
   ChurchTooltip,
+  CountyTooltip,
 } from "./MapOverlays";
 import { useChurchMapData } from "./useChurchMapData";
 import { getChurchUrlSegment } from "./url-utils";
@@ -291,6 +292,7 @@ function MapArea({
                 totalChurches={d.totalChurches}
                 allStatesLoaded={d.allStatesLoaded}
                 statePopulations={d.statePopulations}
+                countyStats={d.countyStats ?? null}
                 onClose={() => d.setShowSummary(false)}
                 onNavigateToState={(abbrev) => {
                   d.setShowSummary(false);
@@ -331,6 +333,9 @@ function MapArea({
         onChurchHover={d.setHoveredChurch}
         isTransitioning={d.isTransitioning}
         onUserInteractionStart={d.clearTransition}
+        countyStats={d.countyStats ?? null}
+        hoveredCounty={d.hoveredCounty ?? null}
+        onCountyHover={d.setHoveredCounty}
       />
 
       {/* Tooltips */}
@@ -339,6 +344,9 @@ function MapArea({
       )}
       {d.hoveredChurch && d.hoveredChurch.id !== d.selectedChurch?.id && (
         <ChurchTooltip church={d.hoveredChurch} tooltipPos={d.tooltipPos} />
+      )}
+      {d.focusedState && d.hoveredCounty && d.countyStats && !d.hoveredChurch && (
+        <CountyTooltip countyFips={d.hoveredCounty} countyStats={d.countyStats} tooltipPos={d.tooltipPos} />
       )}
 
       {/* Click-catcher: dismiss all overlays */}

@@ -160,6 +160,39 @@ export function StateTooltip({
   );
 }
 
+// --- County Tooltip (state view hover over county) ---
+export function CountyTooltip({
+  countyFips,
+  countyStats,
+  tooltipPos,
+}: {
+  countyFips: string;
+  countyStats: { byFips: Record<string, { churchCount: number; peoplePer: number; name?: string }> };
+  tooltipPos: { x: number; y: number };
+}) {
+  const data = countyStats.byFips[countyFips];
+  if (!data) return null;
+  return (
+    <div
+      className="fixed z-50 pointer-events-none rounded-lg shadow-xl px-4 py-2.5"
+      style={{
+        left: tooltipPos.x + 16,
+        top: tooltipPos.y - 40,
+        backgroundColor: "rgba(30, 16, 64, 0.95)",
+      }}
+    >
+      {data.name && (
+        <div className="text-sm font-semibold text-white">
+          {data.name}
+        </div>
+      )}
+      <div className={data.name ? "text-xs text-purple-300 mt-0.5" : "text-sm text-white"}>
+        {data.churchCount.toLocaleString()} churches · 1 per {data.peoplePer.toLocaleString()} people
+      </div>
+    </div>
+  );
+}
+
 // --- Church Tooltip (hover over dot) ---
 export function ChurchTooltip({
   church,

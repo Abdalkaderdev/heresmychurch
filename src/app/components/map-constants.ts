@@ -86,6 +86,17 @@ export const STATE_COUNT_TIERS = [
   { label: "10,000+", min: 10000, max: Infinity, color: "#4C1D95" },
 ];
 
+// County choropleth: white to light purple (matching surrounding states #EDE4F3 when in state view)
+export const COUNTY_PER_CAPITA_COLORS = [
+  "#FFFFFF",
+  "#F8F4FC",
+  "#F0E8F8",
+  "#E8DCF4",
+  "#E4D4F0",
+  "#E0CCEC",
+  "#EDE4F3",
+];
+
 // Filter churches to state bounding box (handles stale cached data that wasn't bbox-filtered)
 export function filterToStateBounds(churches: { lat: number; lng: number }[], stateAbbrev: string) {
   const bounds = STATE_BOUNDS[stateAbbrev.toUpperCase()];
@@ -104,6 +115,19 @@ export function filterToStateBounds(churches: { lat: number; lng: number }[], st
 export function getStateTier(count: number) {
   if (count <= 0) return STATE_COUNT_TIERS[0];
   return STATE_COUNT_TIERS.find((t) => count >= t.min && count <= t.max) || STATE_COUNT_TIERS[STATE_COUNT_TIERS.length - 1];
+}
+
+/** Returns choropleth color for county by per-capita rank (0 = lowest, 1 = highest). */
+export function getCountyPerCapitaColor(perCapita: number, sortedByPerCapita: { perCapita: number }[]): string {
+  if (sortedByPerCapita.length === 0 || perCapita <= 0) return COUNTY_PER_CAPITA_COLORS[0];
+  const sorted = [...sortedByPerCapita].sort((a, b) => a.perCapita - b.perCapita);
+  const idx = sorted.findIndex((c) => c.perCapita >= perCapita);
+  const rank = idx === -1 ? 1 : idx / sorted.length;
+  const tier = Math.min(
+    COUNTY_PER_CAPITA_COLORS.length - 1,
+    Math.floor(rank * COUNTY_PER_CAPITA_COLORS.length)
+  );
+  return COUNTY_PER_CAPITA_COLORS[tier];
 }
 
 // Compute a zoom level that makes the state fill more of the viewport.

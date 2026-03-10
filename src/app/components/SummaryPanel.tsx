@@ -55,6 +55,11 @@ interface NationalSummaryData {
 
 export type SummaryStats = StateSummaryData | NationalSummaryData;
 
+export type CountyStatsForSummary = {
+  byFips: Record<string, { churchCount: number; population: number; perCapita: number; peoplePer: number; name: string }>;
+  sortedByPerCapita: Array<{ fips: string; name: string; churchCount: number; population: number; perCapita: number; peoplePer: number }>;
+};
+
 interface SummaryPanelProps {
   summaryStats: SummaryStats;
   focusedState: string | null;
@@ -68,6 +73,7 @@ interface SummaryPanelProps {
   onShowListModal: () => void;
   onShowAddChurch: () => void;
   onShowVerification?: () => void;
+  countyStats?: CountyStatsForSummary | null;
 }
 
 export function SummaryPanel({
@@ -83,6 +89,7 @@ export function SummaryPanel({
   onShowListModal,
   onShowAddChurch,
   onShowVerification,
+  countyStats,
 }: SummaryPanelProps) {
   return (
     <motion.div
@@ -114,6 +121,7 @@ export function SummaryPanel({
             focusedStateName={focusedStateName}
             churchCount={churches.length}
             statePopulation={statePopulations[focusedState!]}
+            countyStats={countyStats ?? null}
           />
         ) : (
           <NationalSummaryContent
@@ -179,12 +187,14 @@ function StateSummaryContent({
   focusedStateName,
   churchCount,
   statePopulation,
+  countyStats,
 }: {
   stats: StateSummaryData;
   focusedState: string;
   focusedStateName: string;
   churchCount: number;
   statePopulation?: number;
+  countyStats?: CountyStatsForSummary | null;
 }) {
   return (
     <>
@@ -202,6 +212,33 @@ function StateSummaryContent({
 
       {/* Interesting facts */}
       <FactsList facts={stats.interestingFacts} />
+
+      {/* County ranking by churches per capita */}
+      {countyStats && countyStats.sortedByPerCapita.length > 0 && (
+        <div>
+          <span className="text-[10px] uppercase tracking-widest text-purple-400/70 font-medium block mb-1.5">
+            Counties by churches per capita
+          </span>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
+            <div>
+              <div className="text-white/50 mb-0.5">Most</div>
+              {countyStats.sortedByPerCapita.slice(0, 5).map((c, i) => (
+                <div key={c.fips} className="text-white/80 truncate" title={`${c.churchCount} churches, 1 per ${c.peoplePer.toLocaleString()} people`}>
+                  {i + 1}. {c.name} — 1 per {c.peoplePer.toLocaleString()}
+                </div>
+              ))}
+            </div>
+            <div>
+              <div className="text-white/50 mb-0.5">Fewest</div>
+              {countyStats.sortedByPerCapita.slice(-5).reverse().map((c, i) => (
+                <div key={c.fips} className="text-white/80 truncate" title={`${c.churchCount} churches, 1 per ${c.peoplePer.toLocaleString()} people`}>
+                  {i + 1}. {c.name} — 1 per {c.peoplePer.toLocaleString()}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top denominations */}
       <div>
@@ -413,7 +450,7 @@ function FactsList({
                     >
                       {fact.primary}
                     </span>
-                    <span className="text-purple-300/70 text-[11px] font-medium">
+                    <span className="text-white/55 text-[11px] font-medium">
                       {fact.secondary}
                     </span>
                   </div>

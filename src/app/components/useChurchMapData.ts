@@ -10,10 +10,13 @@ import {
 } from "./api";
 import {
   GEO_URL,
+  COUNTIES_GEO_URL,
   FIPS_TO_STATE,
+  STATE_TO_FIPS,
   filterToStateBounds,
   getStateZoom,
 } from "./map-constants";
+import { COUNTY_POPULATIONS } from "./data/county-populations";
 import { getChurchUrlSegment } from "./url-utils";
 
 /** Match church by route segment (legacy id or numeric shortId). */
@@ -70,7 +73,7 @@ export function useChurchMapData({
   const {
     states, totalChurches, focusedState, focusedStateName, churches,
     loading, populating, error, selectedChurch, statePopulations,
-    detectedState, loadingStateName, zoom, center,
+    detectedState, loadingStateName, zoom, center, countyFeatures,
   } = ds;
 
   // Setter helpers — dd (dispatch) is guaranteed stable by React
@@ -88,12 +91,65 @@ export function useChurchMapData({
   const setLoadingStateName = (v: string) => dd({ type: "SET_LOADING_STATE_NAME", value: v });
   const setZoom = (v: number | ((p: number) => number)) => dd({ type: "SET_ZOOM", value: v });
   const setCenter = (v: [number, number]) => dd({ type: "SET_CENTER", value: v });
+  const setCountyFeatures = (v: Map<string, any> | null) => dd({ type: "SET_COUNTY_FEATURES", value: v });
 
   // ── Sub-hook: loading overlay ──
   const overlay = useLoadingOverlay(loading, populating);
 
   // ── Sub-hook: UI state (filters, tooltips, modals) ──
   const ui = useUIState(focusedState);
+
+  // County-level church counts and per-capita (point-in-polygon vs county TopoJSON)
+  const countyStats = useMemo(() => {
+    if (!focusedState || !countyFeatures?.size || churches.length === 0) return null;
+    const stateFips = STATE_TO_FIPS[focusedState];
+    if (!stateFips) return null;
+    const stateCounties = Array.from(countyFeatures.entries()).filter(([key]) => key.substring(0, 2) === stateFips);
+    const countyNames: Record<string, string> = {};
+    for (const [key, feat] of stateCounties) {
+      countyNames[key] = (feat.properties?.name as string) ?? `County ${key}`;
+    }
+    const byFips: Record<string, { churchCount: number; population: number; perCapita: number; peoplePer: number; name: string }> = {};
+    for (const church of churches) {
+      let fips: string | null = null;
+      for (const [key, feat] of stateCounties) {
+        if (geoContains(feat, [church.lng, church.lat])) {
+          fips = key;
+          break;
+        }
+      }
+      if (!fips) continue;
+      const pop = COUNTY_POPULATIONS[fips] ?? 0;
+      if (!byFips[fips]) {
+        byFips[fips] = { churchCount: 0, population: pop, perCapita: 0, peoplePer: 0, name: countyNames[fips] ?? `County ${fips}` };
+      }
+      byFips[fips].churchCount += 1;
+    }
+    const sorted: Array<{ fips: string; name: string; churchCount: number; population: number; perCapita: number; peoplePer: number }> = [];
+    for (const [fips, data] of Object.entries(byFips)) {
+      const pop = data.population || 1;
+      const perCapita = data.churchCount / pop;
+      const peoplePer = Math.round(pop / data.churchCount);
+      sorted.push({
+        fips,
+        name: data.name,
+        churchCount: data.churchCount,
+        population: data.population,
+        perCapita,
+        peoplePer,
+      });
+    }
+    sorted.sort((a, b) => b.perCapita - a.perCapita);
+    return {
+      byFips: Object.fromEntries(
+        Object.entries(byFips).map(([f, d]) => [
+          f,
+          { ...d, perCapita: d.churchCount / (d.population || 1), peoplePer: Math.round((d.population || 1) / d.churchCount) },
+        ])
+      ),
+      sortedByPerCapita: sorted,
+    };
+  }, [focusedState, countyFeatures, churches]);
 
   // ── Sub-hook: filtered churches + derived stats ──
   const filters = useChurchFilters(
@@ -104,6 +160,7 @@ export function useChurchMapData({
     focusedState,
     states,
     statePopulations,
+    countyStats,
   );
 
   // ── Consolidated refs (single useRef — was 9+, saves ~8 hooks) ──
@@ -112,6 +169,7 @@ export function useChurchMapData({
     loadVersion: 0,
     preloadedChurch: null as Church | null,
     stateFeatures: new Map<string, any>(),
+    countyFeatures: new Map<string, any>(),
     churchCache: new Map<string, Church[]>(),
     pendingTransition: null as {
       abbrev: string;
@@ -616,6 +674,28 @@ export function useChurchMapData({
         console.warn("[ChurchMap] Failed to load topojson for polygon filtering:", err)
       );
 
+    fetch(COUNTIES_GEO_URL)
+      .then((res) => res.json())
+      .then((topology: any) => {
+        if (!topology?.objects?.counties) {
+          console.warn("[ChurchMap] Invalid counties topology");
+          return;
+        }
+        const geojson = feature(topology, topology.objects.counties) as any;
+        const countyMap = new Map<string, any>();
+        if (geojson?.features) {
+          for (const f of geojson.features) {
+            const fips = String(f.id ?? "").padStart(5, "0");
+            if (fips.length === 5) countyMap.set(fips, f);
+          }
+        }
+        setCountyFeatures(countyMap);
+        console.log(`[ChurchMap] Loaded county features for ${countyMap.size} counties`);
+      })
+      .catch((err) =>
+        console.warn("[ChurchMap] Failed to load county topojson:", err)
+      );
+
     fetchStatePopulations()
       .then((data) => {
         setStatePopulations(data.populations);
@@ -663,6 +743,7 @@ export function useChurchMapData({
       ui.setShowFilterPanel(false);
       ui.setShowListModal(false);
       ui.setLanguageFilter("all");
+      ui.setHoveredCounty(null);
       overlay.setForceLoadingVisible(false);
       refs.current.pendingTransition = null;
       refs.current.moveEndSuppressedUntil = Date.now() + 1100;
@@ -851,6 +932,8 @@ export function useChurchMapData({
     setHoveredChurch: ui.setHoveredChurch,
     hoveredState: ui.hoveredState,
     setHoveredState: ui.setHoveredState,
+    hoveredCounty: ui.hoveredCounty,
+    setHoveredCounty: ui.setHoveredCounty,
     tooltipPos: ui.tooltipPos,
     showFilterPanel: ui.showFilterPanel,
     setShowFilterPanel: ui.setShowFilterPanel,
@@ -891,6 +974,7 @@ export function useChurchMapData({
     denomCounts: filters.denomCounts,
     sizeCounts: filters.sizeCounts,
     summaryStats: filters.summaryStats,
+    countyStats,
     // Actions
     loadStateData,
     refetchCurrentStateChurches,
@@ -921,6 +1005,7 @@ type DataState = {
   zoom: number;
   center: [number, number];
   isTransitioning: boolean;
+  countyFeatures: Map<string, any> | null;
 };
 
 type DataAction =
@@ -939,6 +1024,7 @@ type DataAction =
   | { type: "SET_ZOOM"; value: number | ((p: number) => number) }
   | { type: "SET_CENTER"; value: [number, number] }
   | { type: "SET_TRANSITIONING"; value: boolean }
+  | { type: "SET_COUNTY_FEATURES"; value: Map<string, any> | null }
   | { type: "RESET_TO_NATIONAL" };
 
 const initialDataState: DataState = {
@@ -957,6 +1043,7 @@ const initialDataState: DataState = {
   zoom: 1,
   center: [-96, 38] as [number, number],
   isTransitioning: false,
+  countyFeatures: null,
 };
 
 function dataReducer(state: DataState, action: DataAction): DataState {
@@ -1003,6 +1090,8 @@ function dataReducer(state: DataState, action: DataAction): DataState {
       return { ...state, center: action.value };
     case "SET_TRANSITIONING":
       return state.isTransitioning === action.value ? state : { ...state, isTransitioning: action.value };
+    case "SET_COUNTY_FEATURES":
+      return { ...state, countyFeatures: action.value };
     case "RESET_TO_NATIONAL":
       return {
         ...state,

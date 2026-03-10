@@ -15,6 +15,11 @@ interface InterestingFact {
   abbrev?: string;
 }
 
+/** Minimal type for county stats used by state summary (underserved fact). */
+type CountyStatsForSummary = {
+  sortedByPerCapita: Array<{ name: string; peoplePer: number }>;
+} | null;
+
 export function useChurchFilters(
   churches: Church[],
   activeSize: Set<string>,
@@ -23,6 +28,7 @@ export function useChurchFilters(
   focusedState: string | null,
   states: StateInfo[],
   statePopulations: Record<string, number>,
+  countyStats?: CountyStatsForSummary,
 ) {
   // Filter churches
   const filteredChurches = useMemo(() => {
@@ -110,11 +116,11 @@ export function useChurchFilters(
   // Summary stats
   const summaryStats = useMemo(() => {
     if (focusedState && churches.length > 0) {
-      return computeStateSummary(churches, denomCounts, sizeCounts);
+      return computeStateSummary(churches, denomCounts, sizeCounts, countyStats ?? null);
     } else {
       return computeNationalSummary(states, statePopulations);
     }
-  }, [focusedState, churches, states, denomCounts, sizeCounts, statePopulations]);
+  }, [focusedState, churches, states, denomCounts, sizeCounts, statePopulations, countyStats]);
 
   return {
     filteredChurches,
@@ -130,6 +136,7 @@ function computeStateSummary(
   churches: Church[],
   denomCounts: Record<string, number>,
   sizeCounts: Record<string, number>,
+  countyStats: CountyStatsForSummary,
 ) {
   const totalAttendance = churches.reduce((sum, ch) => sum + ch.attendance, 0);
   const avgAttendance = Math.round(totalAttendance / churches.length);
@@ -206,6 +213,17 @@ function computeStateSummary(
       label: "Church capital",
       primary: topCity[0],
       secondary: `${topCity[1].toLocaleString()} churches (${pctOfState}% of state)`,
+    });
+  }
+
+  // Most underserved county (fewest churches per capita)
+  if (countyStats?.sortedByPerCapita?.length > 0) {
+    const underserved = countyStats.sortedByPerCapita[countyStats.sortedByPerCapita.length - 1];
+    facts.push({
+      icon: "mapPin",
+      label: "County that could use more churches",
+      primary: underserved.name,
+      secondary: `1 per ${underserved.peoplePer.toLocaleString()} people`,
     });
   }
 
