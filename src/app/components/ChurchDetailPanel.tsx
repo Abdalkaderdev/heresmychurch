@@ -239,6 +239,7 @@ export function ChurchDetailPanel({
   const [counts, setCounts] = useState<ReactionCounts>({ not_for_me: 0, like: 0, love: 0 });
   const [reactionAnimKeys, setReactionAnimKeys] = useState({ not_for_me: 0, like: 0, love: 0 });
   const [reactionSubmitting, setReactionSubmitting] = useState(false);
+  const [reactionError, setReactionError] = useState(false);
   const hasSubmittedReaction = useRef(false);
   const sizeCat = getSizeCategory(church.attendance);
   const denomGroup = getDenominationGroup(church.denomination);
@@ -319,6 +320,7 @@ export function ChurchDetailPanel({
   // Fetch reactions
   useEffect(() => {
     setReactionsLoading(true);
+    setReactionError(false);
     setMyReaction(null);
     setCounts({ not_for_me: 0, like: 0, love: 0 });
     fetchReactions(church.id)
@@ -328,7 +330,10 @@ export function ChurchDetailPanel({
           setCounts(data.counts);
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error("Failed to fetch reactions:", err);
+        setReactionError(true);
+      })
       .finally(() => setReactionsLoading(false));
   }, [church.id]);
 
@@ -348,9 +353,9 @@ export function ChurchDetailPanel({
   const handleReaction = async (reaction: ReactionType) => {
     setReactionAnimKeys((k) => ({ ...k, [reaction]: k[reaction] + 1 }));
     hasSubmittedReaction.current = true;
+    setReactionError(false);
 
-    // Optimistic update — applied immediately and never reverted so the UI
-    // stays consistent even if the server call is slow or fails.
+    // Optimistic update — applied immediately so the UI feels instant.
     const isToggle = myReaction === reaction;
     const newCounts = { ...counts };
     if (isToggle) {
@@ -370,14 +375,10 @@ export function ChurchDetailPanel({
       if (res.myReaction !== undefined) setMyReaction(res.myReaction);
     } catch (err) {
       console.error("Failed to submit reaction:", err);
+      setReactionError(true);
     } finally {
       setReactionSubmitting(false);
     }
-  };
-
-  const openEditForField = (field: string) => {
-    setEditFocusField(field);
-    setShowEditForm(true);
   };
 
   if (showEditForm) {
@@ -555,6 +556,9 @@ export function ChurchDetailPanel({
                 </div>
               );
             })()}
+            {reactionError && (
+              <p className="text-red-400/80 text-xs">Failed to save — check your connection and try again.</p>
+            )}
           </div>
         )}
 
@@ -565,11 +569,10 @@ export function ChurchDetailPanel({
 
         {/* Primary: Core stats — 2-col grid for attendance + denomination */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg px-3 py-2.5 bg-white/5 border border-white/5 group/card">
+          <div className="rounded-lg px-3 py-2.5 bg-white/5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1">
               <Users size={13} className="text-purple-400 flex-shrink-0" />
               <span className="text-[10px] uppercase tracking-wider text-white/35 font-semibold">Attendance</span>
-              <button onClick={() => openEditForField("attendance")} className="ml-auto p-0.5 rounded hover:bg-white/10 transition-colors opacity-0 group-hover/card:opacity-100"><Pencil size={10} className="text-white/30" /></button>
             </div>
             <div className="text-white text-base font-semibold">~{church.attendance.toLocaleString()}</div>
             <div className="flex items-center gap-1.5 mt-0.5">
@@ -577,11 +580,10 @@ export function ChurchDetailPanel({
               <span className="text-white/50 text-xs">{sizeCat.label}</span>
             </div>
           </div>
-          <div className="rounded-lg px-3 py-2.5 bg-white/5 border border-white/5 group/card">
+          <div className="rounded-lg px-3 py-2.5 bg-white/5 border border-white/5">
             <div className="flex items-center gap-1.5 mb-1">
               <ChurchIcon size={13} className="text-purple-400 flex-shrink-0" />
               <span className="text-[10px] uppercase tracking-wider text-white/35 font-semibold">Denomination</span>
-              <button onClick={() => openEditForField("denomination")} className="ml-auto p-0.5 rounded hover:bg-white/10 transition-colors opacity-0 group-hover/card:opacity-100"><Pencil size={10} className="text-white/30" /></button>
             </div>
             <div className="text-white text-sm font-semibold">{church.denomination === "Other" || church.denomination === "Unknown" ? "Unspecified" : church.denomination}</div>
             <div className="text-white/40 text-xs mt-0.5">{sameDenomCount.toLocaleString()} similar in state</div>
@@ -591,13 +593,12 @@ export function ChurchDetailPanel({
         {/* Languages — single language: simple line with icon; multiple: badges */}
         {church.languages && church.languages.length > 0 && (
           church.languages.length === 1 ? (
-            <div className="rounded-lg px-3 py-2.5 bg-white/5 border border-white/10 group/card flex items-center gap-2">
+            <div className="rounded-lg px-3 py-2.5 bg-white/5 border border-white/10 flex items-center gap-2">
               <Languages size={14} className="text-purple-400 flex-shrink-0" />
               <span className="text-sm text-white/90">{church.languages[0]}</span>
-              <button onClick={() => openEditForField("languages")} className="ml-auto p-1 rounded hover:bg-white/10 transition-colors opacity-0 group-hover/card:opacity-100 flex-shrink-0"><Pencil size={11} className="text-white/30" /></button>
             </div>
           ) : (
-            <div className="rounded-lg px-3 py-2.5 bg-white/5 border border-white/10 group/card flex items-center gap-2">
+            <div className="rounded-lg px-3 py-2.5 bg-white/5 border border-white/10 flex items-center gap-2">
               <Languages size={14} className="text-purple-400 flex-shrink-0" />
               <div className="flex flex-wrap gap-1.5 min-w-0 flex-1">
                 {church.languages.map((lang) => (
@@ -606,7 +607,6 @@ export function ChurchDetailPanel({
                   </span>
                 ))}
               </div>
-              <button onClick={() => openEditForField("languages")} className="p-1 rounded hover:bg-white/10 transition-colors opacity-0 group-hover/card:opacity-100 flex-shrink-0"><Pencil size={11} className="text-white/30" /></button>
             </div>
           )
         )}
@@ -674,12 +674,12 @@ export function ChurchDetailPanel({
             {confirmed ? (
               <>
                 <Check size={15} className="text-green-400" />
-                <span className="text-green-400 text-sm font-semibold">Data confirmed, thank you!</span>
+                <span className="text-green-400 text-sm font-medium">Data confirmed, thank you!</span>
               </>
             ) : (
               <>
                 <ShieldCheck size={15} className="text-green-400 group-hover:text-green-300 transition-colors" />
-                <span className="text-green-300 text-sm font-semibold group-hover:text-green-200 transition-colors">
+                <span className="text-green-300 text-sm font-medium group-hover:text-green-200 transition-colors">
                   Data looks correct
                 </span>
               </>
@@ -692,7 +692,7 @@ export function ChurchDetailPanel({
             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/20 transition-colors group"
           >
             <Pencil size={15} className="text-purple-400 group-hover:text-purple-300 transition-colors" />
-            <span className="text-purple-300 text-sm font-semibold group-hover:text-purple-200 transition-colors">
+            <span className="text-purple-300 text-sm font-medium group-hover:text-purple-200 transition-colors">
               Update Church Info
             </span>
             {missingFieldCount > 0 && (
