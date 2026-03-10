@@ -81,6 +81,15 @@ State and church pages get programmatic Open Graph images so shares show the sta
 - [shadcn/ui](https://ui.shadcn.com) — MIT licensed component library
 - Originally built with [Figma Make](https://www.figma.com/make) — the [original project](https://www.figma.com/design/DDx89YVARqkAInuPhDGvFY/Here-s-My-Church)
 
+## Support the project
+
+Here's My Church is free and open source. The only ways we monetize are:
+
+- **Donations** — [GitHub Sponsors](https://github.com/sponsors/harvouscom) (or add Ko‑fi, Buy Me a Coffee, etc.)
+- **Sponsored placement** — Churches or organizations can support the project in exchange for featured placement. (Add a link or email here when you’re ready.)
+
+Contributions are welcome — open an issue or submit a pull request.
+
 ## License
 
-Open source. Feel free to contribute, open issues, or submit pull requests.
+This project is open source under the **MIT License**. See [LICENSE](LICENSE) for the full text. You may use, modify, and distribute the code with attribution.

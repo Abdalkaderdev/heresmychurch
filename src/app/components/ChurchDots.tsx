@@ -127,6 +127,12 @@ export const ChurchDots = memo(function ChurchDots({
     onChurchHover(null);
   }, [onChurchHover]);
 
+  // On narrow viewports (mobile), r/zoom keeps dots at a constant but tiny pixel
+  // size. Using sqrt(zoom) instead lets dots grow as you zoom in — the behaviour
+  // users expect when pinch-zooming to tap a specific church.
+  const isNarrow = typeof window !== "undefined" && window.innerWidth < 768;
+  const zoomDiv = isNarrow ? Math.pow(zoom, 0.75) : zoom;
+
   // If context/projection not ready yet, render nothing
   if (!projection || visible.length === 0) return null;
 
@@ -150,11 +156,11 @@ export const ChurchDots = memo(function ChurchDots({
             data-id={v.id}
             cx={v.x}
             cy={v.y}
-            r={v.r / zoom}
+            r={v.r / zoomDiv}
             fill={v.color}
             fillOpacity={0.8}
             stroke="rgba(255,255,255,0.6)"
-            strokeWidth={0.8 / zoom}
+            strokeWidth={0.8 / zoomDiv}
             style={{ cursor: "pointer" }}
           />
         )
@@ -166,11 +172,11 @@ export const ChurchDots = memo(function ChurchDots({
           data-id={selectedEntry.id}
           cx={selectedEntry.x}
           cy={selectedEntry.y}
-          r={(selectedEntry.r * 1.6) / zoom}
+          r={(selectedEntry.r * 1.6) / zoomDiv}
           fill="#fff"
           fillOpacity={1}
           stroke={selectedEntry.color}
-          strokeWidth={2.5 / zoom}
+          strokeWidth={2.5 / zoomDiv}
           style={{ cursor: "pointer" }}
         />
       )}

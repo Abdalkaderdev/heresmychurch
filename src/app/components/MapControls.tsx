@@ -3,24 +3,29 @@ import {
   ZoomOut,
   RotateCcw,
   Filter,
+  Key,
 } from "lucide-react";
 
 export function MapControls({
   focusedState,
   showFilterPanel,
+  showLegend,
   onZoomIn,
   onZoomOut,
   onResetView,
   onToggleFilter,
+  onToggleLegend,
   zoom,
   compact = false,
 }: {
   focusedState: string | null;
   showFilterPanel: boolean;
+  showLegend: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onResetView: () => void;
   onToggleFilter: () => void;
+  onToggleLegend: () => void;
   zoom: number;
   compact?: boolean;
 }) {
@@ -35,7 +40,7 @@ export function MapControls({
       <button
         onClick={onZoomIn}
         disabled={zoomInDisabled}
-        className={`${sizeClass} rounded-lg flex items-center justify-center shadow-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
+        className={`${sizeClass} rounded-full flex items-center justify-center shadow-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
         style={{ backgroundColor: "rgba(30,16,64,0.9)" }}
       >
         <ZoomIn size={iconSize} color="#C9A0DC" />
@@ -43,14 +48,14 @@ export function MapControls({
       <button
         onClick={onZoomOut}
         disabled={zoomOutDisabled}
-        className={`${sizeClass} rounded-lg flex items-center justify-center shadow-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
+        className={`${sizeClass} rounded-full flex items-center justify-center shadow-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
         style={{ backgroundColor: "rgba(30,16,64,0.9)" }}
       >
         <ZoomOut size={iconSize} color="#C9A0DC" />
       </button>
       <button
         onClick={onResetView}
-        className={`${sizeClass} rounded-lg flex items-center justify-center shadow-md transition-colors`}
+        className={`${sizeClass} rounded-full flex items-center justify-center shadow-md transition-colors`}
         style={{ backgroundColor: "rgba(30,16,64,0.9)" }}
       >
         <RotateCcw size={iconSize} color="#C9A0DC" />
@@ -58,7 +63,7 @@ export function MapControls({
       {focusedState && (
         <button
           onClick={onToggleFilter}
-          className={`${sizeClass} rounded-lg flex items-center justify-center shadow-md transition-colors`}
+          className={`${sizeClass} rounded-full flex items-center justify-center shadow-md transition-colors`}
           style={{
             backgroundColor: showFilterPanel
               ? "#6B21A8"
@@ -68,6 +73,19 @@ export function MapControls({
           <Filter size={iconSize} color={showFilterPanel ? "#fff" : "#C9A0DC"} />
         </button>
       )}
+      <button
+        onClick={onToggleLegend}
+        title="Map Key"
+        aria-label="Map Key"
+        className={`${sizeClass} rounded-full flex items-center justify-center shadow-md transition-colors`}
+        style={{
+          backgroundColor: showLegend
+            ? "#6B21A8"
+            : "rgba(30,16,64,0.9)",
+        }}
+      >
+        <Key size={iconSize} color={showLegend ? "#fff" : "#C9A0DC"} />
+      </button>
     </div>
   );
 }

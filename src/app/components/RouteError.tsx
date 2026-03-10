@@ -1,5 +1,6 @@
 import { useRouteError } from "react-router";
-import { Church, RefreshCw, Home } from "lucide-react";
+import { RefreshCw, Home } from "lucide-react";
+import logoImg from "../../assets/a94bce1cf0860483364d5d9c353899b7da8233e7.png";
 
 export function RouteError() {
   const error = useRouteError();
@@ -21,13 +22,8 @@ export function RouteError() {
       }}
     >
       <div className="flex flex-col items-center gap-5 px-8 py-10 rounded-2xl max-w-md text-center">
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center"
-          style={{
-            background: "linear-gradient(135deg, #6B21A8 0%, #A855F7 100%)",
-          }}
-        >
-          <Church size={28} className="text-white" />
+        <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center">
+          <img src={logoImg} alt="Here's My Church" className="w-full h-full object-cover" />
         </div>
         <div>
           <h1 className="text-white text-xl font-bold mb-2">

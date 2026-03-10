@@ -21,6 +21,8 @@ import { MapLegend } from "./MapLegend";
 import { MapControls } from "./MapControls";
 import { MapCanvas } from "./MapCanvas";
 import { VerificationModal } from "./VerificationModal";
+import { StateFlag } from "./StateFlag";
+import { useActiveUsers } from "./hooks/useActiveUsers";
 import {
   LoadingOverlay,
   ErrorOverlay,
@@ -31,7 +33,8 @@ import {
 } from "./MapOverlays";
 import { useChurchMapData } from "./useChurchMapData";
 import { getChurchUrlSegment } from "./url-utils";
-import { useReducer, useEffect, useMemo } from "react";
+import { useIsMobile } from "./ui/use-mobile";
+import { useReducer, useEffect, useMemo, useState } from "react";
 import logoImg from "../../assets/a94bce1cf0860483364d5d9c353899b7da8233e7.png";
 
 /** Set to true to temporarily hide All States button, Map Key, and action controls (zoom/filter). */
@@ -69,7 +72,13 @@ export function ChurchMap({
   const showErrorOverlay = d.error && d.focusedState && !d.loading && !d.populating && !d.forceLoadingVisible && d.churches.length === 0;
   const showErrorBanner = d.error && (d.churches.length > 0 || !d.focusedState);
 
-  const anyOverlayOpen = d.showSummary || d.showFilterPanel || d.showLegend || !d.searchCollapsed;
+  const isMobile = useIsMobile();
+  // State/church view: always show full search. National: collapsed only on mobile.
+  const effectiveSearchCollapsed =
+    d.focusedState || d.selectedChurch ? false : (d.searchCollapsed && isMobile);
+  // Only count search as "overlay open" on national + mobile (so map tap can collapse the pill). Desktop national and state/church always show full search — no overlay for search.
+  const isNationalView = !d.focusedState && !d.selectedChurch;
+  const anyOverlayOpen = d.showSummary || d.showFilterPanel || d.showLegend || (isNationalView && isMobile && !effectiveSearchCollapsed);
   // Plain closures (no useCallback — saves 5 hooks)
   const dismissAllOverlays = () => {
     d.setShowSummary(false);
@@ -113,6 +122,12 @@ export function ChurchMap({
   };
   const onShowAbout = () => localDispatch({ type: "SET", key: "showAbout", value: true });
 
+  const { people: activePeople, bots: activeBots } = useActiveUsers();
+  const [isLocalhost, setIsLocalhost] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined") setIsLocalhost(window.location.hostname === "localhost");
+  }, []);
+
   return (
     <div
       className={`relative size-full overflow-hidden flex ${d.selectedChurch ? 'flex-col md:flex-row' : ''}`}
@@ -135,6 +150,10 @@ export function ChurchMap({
         showAbout={local.showAbout}
         onDismissAbout={dismissAbout}
         onShowAbout={onShowAbout}
+        activePeople={activePeople}
+        activeBots={activeBots}
+        isLocalhost={isLocalhost}
+        searchCollapsed={effectiveSearchCollapsed}
       />
 
       {/* Modals (rendered outside map area to reduce nesting depth) */}
@@ -230,6 +249,10 @@ function MapArea({
   showAbout,
   onDismissAbout,
   onShowAbout,
+  activePeople,
+  activeBots,
+  isLocalhost,
+  searchCollapsed,
 }: {
   d: ReturnType<typeof useChurchMapData>;
   isLoadingVisible: boolean;
@@ -245,6 +268,10 @@ function MapArea({
   showAbout: boolean;
   onDismissAbout: () => void;
   onShowAbout: () => void;
+  activePeople: number;
+  activeBots: number;
+  isLocalhost: boolean;
+  searchCollapsed: boolean;
 }) {
   return (
     <div className={`${d.selectedChurch ? 'h-[45vh] md:h-full md:flex-1' : 'flex-1'} relative`} style={{ backgroundColor: "#F5F0E8" }}>
@@ -379,17 +406,19 @@ function MapArea({
           {(d.focusedState || d.selectedChurch) && (
             <button
               onClick={d.handleResetView}
-              title="All States"
-              aria-label="All States"
-              className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md transition-colors hover:opacity-90"
+              title="All states"
+              aria-label="All states"
+              className="flex items-center gap-1.5 h-8 pl-2 pr-2.5 rounded-full shadow-md transition-colors hover:opacity-90 text-white text-xs font-medium"
               style={{ backgroundColor: "rgba(107, 33, 168, 0.9)" }}
             >
               <ArrowLeft size={14} color="#fff" />
+              All states
             </button>
           )}
           <MapControls
             focusedState={d.focusedState}
             showFilterPanel={d.showFilterPanel}
+            showLegend={d.showLegend}
             onZoomIn={d.handleZoomIn}
             onZoomOut={d.handleZoomOut}
             onResetView={d.handleResetView}
@@ -398,6 +427,14 @@ function MapArea({
                 if (!v) { d.setShowSummary(false); d.setShowLegend(false); d.setSearchCollapsed(true); }
                 return !v;
               });
+            }}
+            onToggleLegend={() => {
+              const willOpen = !d.showLegend;
+              d.setShowLegend((v) => !v);
+              if (willOpen) {
+                d.setShowSummary(false);
+                d.setShowFilterPanel(false);
+              }
             }}
             zoom={d.zoom}
             compact
@@ -438,18 +475,45 @@ function MapArea({
       )}
 
       {!isLoadingVisible && !d.showFilterPanel && (
-        <MapSearchBar
-          churches={d.churches}
-          states={d.states}
-          focusedState={d.focusedState}
-          focusedStateName={d.focusedStateName}
-          navigateToChurch={navigateToChurch}
-          onPreloadChurch={d.preloadChurch}
-          collapsed={d.searchCollapsed}
-          onExpand={() => { d.setSearchCollapsed(false); d.setShowFilterPanel(false); }}
-          onAddChurch={d.focusedState ? () => { d.setShowAddChurchFromSummary(true); } : undefined}
-          detectedState={d.detectedState}
-        />
+        <div className="absolute bottom-[24px] left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2.5">
+          {/* Active now — 10px above search; search list z-index is above this */}
+          {((activePeople + activeBots) > 1 || (isLocalhost && (activePeople + activeBots) >= 1)) && (
+            <div className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full min-w-0 truncate bg-green-500/5 border border-green-500/10">
+              <span
+                className="relative flex h-1.5 w-1.5 flex-shrink-0"
+                aria-hidden
+              >
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-600 opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-600" />
+              </span>
+              <span className="text-green-700 text-[11px] font-medium truncate">
+                {activePeople > 0 && activeBots === 0
+                  ? activePeople === 1
+                    ? "1 person is here"
+                    : `${activePeople.toLocaleString()} people are here`
+                  : activePeople === 0 && activeBots > 0
+                    ? activeBots === 1
+                      ? "1 bot is here"
+                      : `${activeBots.toLocaleString()} bots are here`
+                    : `${activePeople === 1 ? "1 person" : `${activePeople.toLocaleString()} people`}, ${activeBots === 1 ? "1 bot" : `${activeBots.toLocaleString()} bots`} are here`}
+              </span>
+            </div>
+          )}
+          <MapSearchBar
+            churches={d.churches}
+            states={d.states}
+            focusedState={d.focusedState}
+            focusedStateName={d.focusedStateName}
+            navigateToChurch={navigateToChurch}
+            onPreloadChurch={d.preloadChurch}
+            collapsed={searchCollapsed}
+            onExpand={() => { d.setSearchCollapsed(false); d.setShowFilterPanel(false); }}
+            onAddChurch={d.focusedState ? () => { d.setShowAddChurchFromSummary(true); } : undefined}
+            detectedState={d.detectedState}
+            zoom={d.zoom}
+            center={d.center}
+          />
+        </div>
       )}
 
     </div>
@@ -492,12 +556,13 @@ function HeaderPill({
       >
         <ChurchIcon size={18} className="text-purple-300 flex-shrink-0" />
         {focusedState ? (
-          <span className="text-white text-sm text-balance min-w-0 truncate">
+          <span className="text-white text-sm text-balance min-w-0 truncate flex items-center gap-2">
             <span className="font-medium">
               {filteredCount.toLocaleString()} churches
             </span>{" "}
             in{" "}
-            <span className="text-purple-300 font-medium">
+            <span className="text-white font-medium flex items-center gap-1.5">
+              <StateFlag abbrev={focusedState} size="sm" />
               {focusedStateName}
             </span>
           </span>

@@ -87,7 +87,7 @@ export function VerificationModal({
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 px-5 py-3 border-t border-white/6">
+        <div className="flex-shrink-0 px-5 py-3 border-t border-white/6 text-balance">
           <p className="text-white/25 text-[10px] text-center leading-relaxed">
             Critical fields: address, service times, denomination. Click a church to update its info.
           </p>

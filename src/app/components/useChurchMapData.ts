@@ -801,9 +801,9 @@ export function useChurchMapData({
 
     if (churches.length === 0) return;
 
-    const church = routeChurchShortId
-      ? churches.find((c) => (c.shortId ?? c.id) === routeChurchShortId)
-      : churches.find((c) => c.id === routeLegacyChurchId);
+    const church = churches.find((c) =>
+      churchMatchesRouteSegment(c, routeChurchKey!, focusedState ?? "")
+    );
 
     if (church) {
       if (!selectedChurch || selectedChurch.id !== church.id) {

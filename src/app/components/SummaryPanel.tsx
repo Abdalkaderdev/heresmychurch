@@ -11,6 +11,7 @@ import {
   MapPin,
   ShieldCheck,
   Check,
+  Globe,
   type LucideIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -18,6 +19,7 @@ import { sizeCategories } from "./church-data";
 import type { StateInfo } from "./church-data";
 import { fetchCommunityStats } from "./api";
 import type { CommunityStats } from "./api";
+import { StateFlag } from "./StateFlag";
 
 type InterestingFact = {
   icon: string;
@@ -35,6 +37,7 @@ const FACT_ICONS: Record<string, LucideIcon> = {
   book: BookOpen,
   chart: BarChart3,
   mapPin: MapPin,
+  globe: Globe,
 };
 
 interface StateSummaryData {
@@ -51,6 +54,8 @@ interface NationalSummaryData {
   unpopulated: number;
   topStates: StateInfo[];
   interestingFacts: InterestingFact[];
+  nationalPeoplePer?: number;
+  populationMillions?: string;
 }
 
 export type SummaryStats = StateSummaryData | NationalSummaryData;
@@ -102,7 +107,8 @@ export function SummaryPanel({
     >
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/8 flex-shrink-0">
-        <span className="text-xs font-medium text-white uppercase tracking-widest">
+        <span className="flex items-center gap-1.5 text-xs font-medium text-white uppercase tracking-widest">
+          {focusedState && <StateFlag abbrev={focusedState} size="sm" />}
           {focusedState ? `${focusedStateName} Summary` : "Summary"}
         </span>
         <button
@@ -133,7 +139,7 @@ export function SummaryPanel({
         )}
 
         {/* Disclaimer + data source footer */}
-        <div className="pt-2 border-t border-white/5 space-y-1.5">
+        <div className="pt-2 border-t border-white/5 space-y-1.5 text-balance">
           <p className="text-white/30 text-[10px] text-center leading-relaxed italic">
             Not all churches may be represented yet — our goal is for every church to be included.{" "}
             {focusedState
@@ -307,8 +313,11 @@ function NationalSummaryContent({
           <>
             Currently tracking <span className="font-medium text-white">{totalChurches.toLocaleString()} churches</span> across{" "}
             <span className="font-medium text-purple-300">
-              {allStatesLoaded ? "all 50 states" : `${stats.populated} states`}
+              {allStatesLoaded ? "50 states" : `${stats.populated} states`}
             </span>.
+            {stats.nationalPeoplePer != null && stats.populationMillions != null && (
+              <> That&apos;s about <span className="font-medium text-white">1 church per {stats.nationalPeoplePer.toLocaleString()} people</span>, covering <span className="font-medium text-white">{stats.populationMillions} million people</span>.</>
+            )}
             {!allStatesLoaded && stats.unpopulated > 0 && (
               <> <span className="text-white/50">{stats.unpopulated} states haven&apos;t been explored yet.</span></>
             )}
@@ -318,44 +327,28 @@ function NationalSummaryContent({
         )}
       </p>
 
-      {/* Top 3 states by church count */}
+      {/* Top 3 states by church count — podium style */}
       {stats.topStates.length > 0 && (
         <div>
           <span className="text-[10px] uppercase tracking-widest text-purple-400/70 font-medium block mb-2">
             Most Churches
           </span>
-          <div className="space-y-1">
-            {stats.topStates.map((st, i) => {
-              const pct = totalChurches > 0 ? (st.churchCount / totalChurches) * 100 : 0;
-              return (
+          <div className="flex gap-1.5">
+            {stats.topStates.map((st) => (
                 <button
                   key={st.abbrev}
                   onClick={() => onNavigateToState(st.abbrev)}
-                  className="w-full rounded-lg bg-white/4 border border-white/5 px-3 py-2 hover:bg-white/8 transition-colors text-left group cursor-pointer"
+                  className="flex-1 rounded-lg bg-white/4 border border-white/5 px-2 py-2.5 hover:bg-white/8 transition-colors text-center group cursor-pointer flex flex-col items-center"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-white/25 text-[10px] font-mono w-4">{i + 1}.</span>
-                      <span className="text-white text-xs font-semibold group-hover:text-purple-300 transition-colors">
-                        {st.name}
-                      </span>
-                    </div>
-                    <span className="text-white/40 text-[11px]">
-                      {st.churchCount.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-1 rounded-full bg-white/8 overflow-hidden ml-6">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${Math.max(pct, 2)}%`,
-                        background: "linear-gradient(90deg, #A855F7, #6B21A8)",
-                      }}
-                    />
-                  </div>
+                  <StateFlag abbrev={st.abbrev} size="md" />
+                  <span className="text-white text-[13px] font-semibold group-hover:text-purple-300 transition-colors block truncate mt-1 w-full">
+                    {st.name}
+                  </span>
+                  <span className="text-white/45 text-[10px] tabular-nums block mt-0.5">
+                    {st.churchCount.toLocaleString()}
+                  </span>
                 </button>
-              );
-            })}
+            ))}
           </div>
         </div>
       )}
@@ -442,17 +435,22 @@ function FactsList({
                   <span className="text-white/50 text-[10px] uppercase tracking-wide font-medium block">
                     {fact.label}
                   </span>
-                  <div className="flex items-center justify-between mt-0.5">
-                    <span
-                      className={`text-white text-xs font-semibold ${
-                        isClickable ? "group-hover:text-purple-300" : ""
-                      } transition-colors`}
-                    >
-                      {fact.primary}
+                  <div className="flex items-center justify-between mt-0.5 gap-2">
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      {fact.abbrev && <StateFlag abbrev={fact.abbrev} size="sm" />}
+                      <span
+                        className={`text-white text-xs font-semibold truncate ${
+                          isClickable ? "group-hover:text-purple-300" : ""
+                        } transition-colors`}
+                      >
+                        {fact.primary}
+                      </span>
                     </span>
-                    <span className="text-white/55 text-[11px] font-medium">
-                      {fact.secondary}
-                    </span>
+                    {fact.secondary ? (
+                      <span className="text-white/55 text-[11px] font-medium flex-shrink-0">
+                        {fact.secondary}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               </div>

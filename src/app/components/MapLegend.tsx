@@ -1,4 +1,4 @@
-import { ChevronDown, Key } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { sizeCategories } from "./church-data";
 import type { StateInfo } from "./church-data";
 import { STATE_COUNT_TIERS } from "./map-constants";
@@ -34,34 +34,24 @@ export function MapLegend({
     }
   };
 
+  if (!showLegend) return null;
+
   return (
     <div className="w-fit">
-      {!showLegend ? (
+      <div
+        className="shadow-lg overflow-hidden rounded-xl w-fit min-w-[140px]"
+        style={{ backgroundColor: "rgba(30, 16, 64, 0.93)" }}
+      >
         <button
           type="button"
           onClick={toggle}
-          title="Map Key"
-          aria-label="Map Key"
-          className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md transition-colors hover:opacity-90"
-          style={{ backgroundColor: "rgba(30, 16, 64, 0.93)" }}
+          className="flex flex-nowrap items-center justify-between gap-2 px-3 py-2 w-full text-left"
         >
-          <Key size={14} color="#C9A0DC" />
+          <span className="text-[11px] font-medium text-white uppercase tracking-wide whitespace-nowrap">
+            Map Key
+          </span>
+          <ChevronDown size={12} className="text-white/50 rotate-180 flex-shrink-0" />
         </button>
-      ) : (
-        <div
-          className="shadow-lg overflow-hidden rounded-xl w-fit min-w-[140px]"
-          style={{ backgroundColor: "rgba(30, 16, 64, 0.93)" }}
-        >
-          <button
-            type="button"
-            onClick={toggle}
-            className="flex flex-nowrap items-center justify-between gap-2 px-3 py-2 w-full text-left"
-          >
-            <span className="text-[11px] font-medium text-white uppercase tracking-wide whitespace-nowrap">
-              Map Key
-            </span>
-            <ChevronDown size={12} className="text-white/50 rotate-180 flex-shrink-0" />
-          </button>
           <div className="px-3 pb-3">
             <div className="pt-2 border-t border-white/10">
               <span className="text-[11px] font-medium text-purple-300 uppercase tracking-wide block mb-2">
@@ -81,7 +71,6 @@ export function MapLegend({
             </div>
           </div>
         </div>
-      )}
     </div>
   );
 }

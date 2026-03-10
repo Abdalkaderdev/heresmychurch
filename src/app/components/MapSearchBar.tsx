@@ -1,9 +1,13 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Search, X, ChevronRight, Loader2, MapPin, ChevronDown, Plus } from "lucide-react";
+import { geoAlbersUsa } from "d3-geo";
 import type { Church, StateInfo } from "./church-data";
 import { searchChurches } from "./api";
 import type { SearchResult } from "./api";
 import { getChurchUrlSegment } from "./url-utils";
+import { StateFlag } from "./StateFlag";
+
+const VIEWPORT_ZOOM_THRESHOLD = 1.5;
 
 // Full state name lookup for search results
 const STATE_NAMES: Record<string, string> = {
@@ -32,6 +36,8 @@ interface MapSearchBarProps {
   onExpand?: () => void;
   onAddChurch?: () => void;
   detectedState?: string | null;
+  zoom?: number;
+  center?: [number, number];
 }
 
 const MAX_RESULTS = 8;
@@ -48,10 +54,13 @@ export function MapSearchBar({
   onExpand,
   onAddChurch,
   detectedState,
+  zoom = 1,
+  center = [-96, 38],
 }: MapSearchBarProps) {
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [searchAllMode, setSearchAllMode] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -115,6 +124,11 @@ export function MapSearchBar({
     }
   }, [collapsed]);
 
+  // Reset "search all" mode when query or zoom changes so we re-apply viewport filter
+  useEffect(() => {
+    setSearchAllMode(false);
+  }, [query, zoom]);
+
   // Apply detected state filter if available
   useEffect(() => {
     if (detectedState && !detectedStateAppliedRef.current) {
@@ -130,8 +144,11 @@ export function MapSearchBar({
       .sort((a, b) => (STATE_NAMES[a.abbrev] || a.abbrev).localeCompare(STATE_NAMES[b.abbrev] || b.abbrev));
   }, [states]);
 
-  // Local search for state view
-  const localResults = useMemo(() => {
+  // Projection matching react-simple-maps (geoAlbersUsa, scale 1000) for viewport filtering
+  const projection = useMemo(() => geoAlbersUsa().scale(1000), []);
+
+  // Local search for state view (all matches, no viewport filter)
+  const localResultsRaw = useMemo(() => {
     if (!focusedState || churches.length === 0) return [];
     const q = query.toLowerCase().trim();
     if (!q) return [];
@@ -146,6 +163,33 @@ export function MapSearchBar({
     }
     return matched;
   }, [query, focusedState, churches]);
+
+  const isViewportSearchMode = zoom > VIEWPORT_ZOOM_THRESHOLD && !!focusedState;
+
+  // Filter to churches in current viewport when zoomed in (same math as ChurchDots viewport culling)
+  const churchesInView = useMemo(() => {
+    if (!isViewportSearchMode || churches.length === 0) return null;
+    const centerSvg = projection(center);
+    if (!centerSvg) return new Set<string>();
+    const halfW = (400 / zoom) * 1.5;
+    const halfH = (300 / zoom) * 1.5;
+    const cx = centerSvg[0];
+    const cy = centerSvg[1];
+    const inView = new Set<string>();
+    for (const ch of churches) {
+      const coords = projection([ch.lng, ch.lat]);
+      if (!coords) continue;
+      if (Math.abs(coords[0] - cx) < halfW && Math.abs(coords[1] - cy) < halfH) {
+        inView.add(ch.id);
+      }
+    }
+    return inView;
+  }, [isViewportSearchMode, churches, center, zoom, projection]);
+
+  const localResults = useMemo(() => {
+    if (!isViewportSearchMode || searchAllMode || !churchesInView) return localResultsRaw;
+    return localResultsRaw.filter((ch) => churchesInView.has(ch.id));
+  }, [localResultsRaw, isViewportSearchMode, searchAllMode, churchesInView]);
 
   // Debounced server search for national view
   useEffect(() => {
@@ -259,7 +303,7 @@ export function MapSearchBar({
   return (
     <div
       ref={containerRef}
-      className="absolute bottom-[24px] left-1/2 -translate-x-1/2 z-20 w-[min(440px,70svw)]"
+      className="relative z-30 w-[min(440px,70svw)]"
     >
       {/* Collapsed state — just a search icon button */}
       {collapsed ? (
@@ -272,7 +316,9 @@ export function MapSearchBar({
           style={{ backgroundColor: "rgba(30, 16, 64, 0.92)" }}
         >
           <Search size={17} className="text-purple-400" />
-          <span className="text-white text-sm font-medium">Search churches…</span>
+          <span className="text-white text-sm font-medium">
+            {zoom > VIEWPORT_ZOOM_THRESHOLD ? "Search churches in view…" : "Search churches…"}
+          </span>
         </button>
       ) : (
         <>
@@ -310,6 +356,7 @@ export function MapSearchBar({
                 inputRef.current?.focus();
               }}
             >
+              <StateFlag abbrev={s.abbrev} size="sm" />
               <span className="w-5 text-[10px] text-white/30 font-mono flex-shrink-0">{s.abbrev}</span>
               {STATE_NAMES[s.abbrev] || s.abbrev}
             </button>
@@ -329,9 +376,25 @@ export function MapSearchBar({
               {localResults.length === 0 ? (
                 <div className="px-4 py-4 text-center">
                   <p className="text-xs text-white/40">
-                    No churches found for &ldquo;{query}&rdquo;
+                    {isViewportSearchMode && !searchAllMode && localResultsRaw.length > 0
+                      ? "No churches in view for \u201c" + query + "\u201c"
+                      : `No churches found for \u201c${query}\u201d`}
                   </p>
-                  {onAddChurch && (
+                  {isViewportSearchMode && !searchAllMode && localResultsRaw.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchAllMode(true);
+                        setSelectedIndex(-1);
+                      }}
+                      className="mt-2.5 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-purple-500/20 text-purple-300 text-xs font-medium hover:bg-purple-500/30 transition-colors"
+                    >
+                      {focusedState && <StateFlag abbrev={focusedState} size="sm" />}
+                      <MapPin size={12} />
+                      Search all of {focusedStateName}
+                    </button>
+                  )}
+                  {onAddChurch && localResultsRaw.length === 0 && (
                     <button
                       onClick={() => {
                         setQuery("");
@@ -373,6 +436,20 @@ export function MapSearchBar({
                     <div className="px-4 py-2 text-xs text-white/30 text-center border-t border-white/5">
                       Keep typing to narrow results…
                     </div>
+                  )}
+                  {isViewportSearchMode && !searchAllMode && focusedState && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchAllMode(true);
+                        setSelectedIndex(-1);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-xs text-purple-300 hover:bg-white/5 border-t border-white/5 transition-colors"
+                    >
+                      {focusedState && <StateFlag abbrev={focusedState} size="sm" />}
+                      <MapPin size={12} className="flex-shrink-0 opacity-70" />
+                      Search all of {focusedStateName}
+                    </button>
                   )}
                 </div>
               )}
@@ -460,12 +537,13 @@ export function MapSearchBar({
         {isNational && hasMultiplePopulated && (
           <button
             onClick={() => setShowStateDropdown((v) => !v)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-colors ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-colors ${
               stateFilter
                 ? "bg-purple-500/30 text-purple-200 hover:bg-purple-500/40"
                 : "bg-white/8 text-white/40 hover:bg-white/12 hover:text-white/60"
             }`}
           >
+            {stateFilter && <StateFlag abbrev={stateFilter} size="sm" />}
             {stateFilter ? stateFilter : "State"}
             <ChevronDown size={10} className={`transition-transform ${showStateDropdown ? "rotate-180" : ""}`} />
           </button>
@@ -480,7 +558,9 @@ export function MapSearchBar({
           onKeyDown={handleKeyDown}
           placeholder={
             focusedState
-              ? `Search churches in ${focusedStateName}…`
+              ? zoom > VIEWPORT_ZOOM_THRESHOLD
+                ? "Search churches in view…"
+                : `Search churches in ${focusedStateName}…`
               : stateFilter
               ? `Search in ${STATE_NAMES[stateFilter] || stateFilter}…`
               : "Find a church…"

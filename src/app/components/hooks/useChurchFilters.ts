@@ -161,17 +161,6 @@ function computeStateSummary(
     });
   }
 
-  if (topDenoms.length > 0) {
-    const [topDenom, topCount] = topDenoms[0];
-    const pct = Math.round((topCount / churches.length) * 100);
-    facts.push({
-      icon: "book",
-      label: "Most common denomination",
-      primary: topDenom,
-      secondary: `${topCount.toLocaleString()} churches (${pct}%)`,
-    });
-  }
-
   facts.push({
     icon: "chart",
     label: "Average weekly attendance",
@@ -224,6 +213,25 @@ function computeStateSummary(
       label: "County that could use more churches",
       primary: underserved.name,
       secondary: `1 per ${underserved.peoplePer.toLocaleString()} people`,
+    });
+  }
+
+  const bilingualByCity: Record<string, number> = {};
+  for (const ch of churches) {
+    const hasMultiple = ch.languages && ch.languages.length >= 2;
+    const prob = estimateBilingualProbability(ch).probability;
+    if (hasMultiple || prob >= 0.15) {
+      const city = ch.city?.trim();
+      if (city) bilingualByCity[city] = (bilingualByCity[city] || 0) + 1;
+    }
+  }
+  const topBilingualCity = Object.entries(bilingualByCity).sort((a, b) => b[1] - a[1])[0];
+  if (topBilingualCity && topBilingualCity[1] >= 3) {
+    facts.push({
+      icon: "globe",
+      label: "Bilingual / multilingual hotspot",
+      primary: topBilingualCity[0],
+      secondary: `${topBilingualCity[1].toLocaleString()} multilingual churches`,
     });
   }
 
@@ -288,25 +296,40 @@ function computeNationalSummary(
     }
   }
 
-  if (hasPop && populated.length >= 2) {
-    const totalChurchCount = populated.reduce((sum, s) => sum + s.churchCount, 0);
-    const totalPop = populated.reduce((sum, s) => sum + (statePopulations[s.abbrev] || 0), 0);
-    if (totalPop > 0) {
-      const peoplePer = Math.round(totalPop / totalChurchCount);
+  const totalChurchCount = populated.reduce((sum, s) => sum + s.churchCount, 0);
+  const totalPop = hasPop ? populated.reduce((sum, s) => sum + (statePopulations[s.abbrev] || 0), 0) : 0;
+  const nationalPeoplePer = totalPop > 0 && totalChurchCount > 0 ? Math.round(totalPop / totalChurchCount) : 0;
+
+  if (hasPop && populated.length >= 2 && totalChurchCount > 0 && totalPop > 0) {
+    const withPerCapita = populated
+      .filter((s) => statePopulations[s.abbrev] && statePopulations[s.abbrev] > 0)
+      .map((s) => ({
+        ...s,
+        peoplePer: Math.round(statePopulations[s.abbrev] / s.churchCount),
+      }));
+    if (withPerCapita.length > 0) {
+      const mostAverage = withPerCapita.reduce((best, s) =>
+        Math.abs(s.peoplePer - nationalPeoplePer) < Math.abs(best.peoplePer - nationalPeoplePer) ? s : best,
+      );
       facts.push({
-        icon: "chart",
-        label: "National ratio",
-        primary: `1 church per ${peoplePer.toLocaleString()} people`,
-        secondary: `${totalChurchCount.toLocaleString()} churches across ${populated.length} states`,
+        icon: "mapPin",
+        label: "Closest to national ratio",
+        primary: mostAverage.name,
+        secondary: `1 per ${mostAverage.peoplePer.toLocaleString()} people`,
+        abbrev: mostAverage.abbrev,
       });
     }
   }
+
+  const populationMillions = hasPop && totalPop > 0 ? (totalPop / 1e6).toFixed(1) : undefined;
 
   return {
     type: "national" as const,
     populated: populated.length,
     unpopulated,
     topStates,
-    interestingFacts: facts.slice(0, 4),
+    interestingFacts: facts.slice(0, 8),
+    nationalPeoplePer: nationalPeoplePer > 0 ? nationalPeoplePer : undefined,
+    populationMillions,
   };
 }

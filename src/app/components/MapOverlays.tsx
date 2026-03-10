@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "motion/react";
 import { Loader2, X } from "lucide-react";
+import { StateFlag } from "./StateFlag";
 import { getSizeCategory } from "./church-data";
 import type { Church } from "./church-data";
 import { formatFullAddress } from "./AddressInput";
@@ -148,7 +149,8 @@ export function StateTooltip({
         backgroundColor: "rgba(30, 16, 64, 0.95)",
       }}
     >
-      <div className="text-sm font-semibold text-white">
+      <div className="flex items-center gap-2 text-sm font-semibold text-white">
+        <StateFlag abbrev={hoveredState} size="sm" />
         {info?.name || hoveredState}
       </div>
       <div className="text-xs text-purple-300 mt-0.5">
@@ -213,7 +215,7 @@ export function ChurchTooltip({
       <div className="text-sm font-semibold text-white">
         {church.name}
       </div>
-      {formatFullAddress(church.address, church.city, church.state) && (
+      {(church.address?.trim() || church.city?.trim()) && (
         <div className="text-xs text-white/50 mt-0.5">
           {formatFullAddress(church.address, church.city, church.state)}
         </div>

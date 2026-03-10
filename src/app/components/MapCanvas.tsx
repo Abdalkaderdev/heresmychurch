@@ -3,7 +3,7 @@
  * Contains ComposableMap, ZoomableGroup, state/county Geographies,
  * the background click-rect, and ChurchDots.
  */
-import { memo } from "react";
+import { memo, useState, useCallback } from "react";
 import {
   ComposableMap,
   Geographies,
@@ -67,8 +67,15 @@ export const MapCanvas = memo(function MapCanvas({
   hoveredCounty,
   onCountyHover,
 }: MapCanvasProps) {
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const markTouch = useCallback(() => setIsTouchDevice(true), []);
+
   return (
-    <div className={isTransitioning ? 'map-transitioning' : ''} style={{ width: '100%', height: '100%' }}>
+    <div
+      className={isTransitioning ? 'map-transitioning' : ''}
+      style={{ width: '100%', height: '100%' }}
+      onTouchStart={markTouch}
+    >
     <ComposableMap
       projection="geoAlbersUsa"
       style={{ width: "100%", height: "100%" }}
@@ -110,6 +117,7 @@ export const MapCanvas = memo(function MapCanvas({
             countyStats={countyStats}
             hoveredCounty={hoveredCounty}
             onCountyHover={onCountyHover}
+            disableHover={isTouchDevice}
           />
         )}
 
@@ -199,11 +207,13 @@ const CountyGeographies = memo(function CountyGeographies({
   countyStats,
   hoveredCounty,
   onCountyHover,
+  disableHover,
 }: {
   focusedState: string;
   countyStats: CountyStats | null;
   hoveredCounty: string | null;
   onCountyHover: (fips: string | null) => void;
+  disableHover?: boolean;
 }) {
   const stateFips = STATE_TO_FIPS[focusedState];
   if (!stateFips) return null;
@@ -219,7 +229,7 @@ const CountyGeographies = memo(function CountyGeographies({
             const fill = data
               ? getCountyPerCapitaColor(data.perCapita, countyStats?.sortedByPerCapita ?? [])
               : "rgba(255, 255, 255, 0.8)";
-            const isHovered = hoveredCounty === fips;
+            const isHovered = !disableHover && hoveredCounty === fips;
             return (
               <Geography
                 key={geo.rsmKey}
@@ -227,13 +237,13 @@ const CountyGeographies = memo(function CountyGeographies({
                 fill={isHovered ? "#D4B8E8" : fill}
                 stroke={isHovered ? "rgba(107, 33, 168, 0.6)" : "rgba(107, 33, 168, 0.25)"}
                 strokeWidth={isHovered ? 0.8 : 0.4}
-                pointerEvents="auto"
-                onMouseEnter={() => onCountyHover(fips)}
-                onMouseLeave={() => onCountyHover(null)}
+                pointerEvents={disableHover ? "none" : "auto"}
+                onMouseEnter={disableHover ? undefined : () => onCountyHover(fips)}
+                onMouseLeave={disableHover ? undefined : () => onCountyHover(null)}
                 style={{
-                  default: { outline: "none", cursor: "pointer" },
-                  hover: { outline: "none", cursor: "pointer" },
-                  pressed: { outline: "none", cursor: "pointer" },
+                  default: { outline: "none", cursor: "default" },
+                  hover: { outline: "none", cursor: "default" },
+                  pressed: { outline: "none", cursor: "default" },
                 }}
               />
             );
