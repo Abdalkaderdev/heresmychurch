@@ -132,8 +132,21 @@ function TimeWithBlinkingColon({ time }: { time: string }) {
   );
 }
 
-// Helper to render service times in a grouped format (primary block)
-function ServiceTimesCard({ serviceTimes }: { serviceTimes: string }) {
+const STATE_TIMEZONE: Record<string, string> = {
+  AL: "CST", AK: "AKST", AZ: "MST", AR: "CST", CA: "PST",
+  CO: "MST", CT: "EST", DE: "EST", FL: "EST", GA: "EST",
+  HI: "HST", ID: "MST", IL: "CST", IN: "EST", IA: "CST",
+  KS: "CST", KY: "EST", LA: "CST", ME: "EST", MD: "EST",
+  MA: "EST", MI: "EST", MN: "CST", MS: "CST", MO: "CST",
+  MT: "MST", NE: "CST", NV: "PST", NH: "EST", NJ: "EST",
+  NM: "MST", NY: "EST", NC: "EST", ND: "CST", OH: "EST",
+  OK: "CST", OR: "PST", PA: "EST", RI: "EST", SC: "EST",
+  SD: "CST", TN: "CST", TX: "CST", UT: "MST", VT: "EST",
+  VA: "EST", WA: "PST", WV: "EST", WI: "CST", WY: "MST",
+  DC: "EST",
+};
+
+function ServiceTimesCard({ serviceTimes, state }: { serviceTimes: string; state?: string }) {
   const grouped = groupServiceTimesByDay(parseServiceTimesForDisplay(serviceTimes));
   return (
     <div className="rounded-xl p-3 bg-white/5 border border-white/5">
@@ -141,6 +154,9 @@ function ServiceTimesCard({ serviceTimes }: { serviceTimes: string }) {
         <Clock size={16} className="text-purple-400" />
         <span className="text-xs uppercase tracking-wider text-white/40 font-semibold">
           Service Times
+          {state && STATE_TIMEZONE[state.toUpperCase()] && (
+            <span className="ml-1 normal-case tracking-normal text-white/25">({STATE_TIMEZONE[state.toUpperCase()]})</span>
+          )}
         </span>
         {grouped.length > 1 && (
           <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-400/70 font-medium">
@@ -564,7 +580,7 @@ export function ChurchDetailPanel({
 
         {/* Primary: Service Times first */}
         {church.serviceTimes && (
-          <ServiceTimesCard serviceTimes={church.serviceTimes} />
+          <ServiceTimesCard serviceTimes={church.serviceTimes} state={church.state} />
         )}
 
         {/* Primary: Core stats — 2-col grid for attendance + denomination */}

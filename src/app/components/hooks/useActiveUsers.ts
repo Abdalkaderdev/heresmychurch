@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getSupabase } from "../../lib/supabase";
 
 const CHANNEL_NAME = "active-users";
@@ -84,6 +84,12 @@ export function useActiveUsers(): { people: number; bots: number } {
   const [counts, setCounts] = useState({ people: 0, bots: 0 });
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabase>["channel"]> | null>(null);
 
+  const retrack = useCallback(() => {
+    const ch = channelRef.current;
+    if (!ch) return;
+    ch.track({ id: getOrCreateSessionId(), isBot: detectBot() }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     const supabase = getSupabase();
     const channel = supabase.channel(CHANNEL_NAME);
@@ -107,13 +113,33 @@ export function useActiveUsers(): { people: number; bots: number } {
 
     channelRef.current = channel;
 
+    // Re-announce presence when the tab becomes visible again (handles mobile
+    // browsers that freeze WebSocket connections when backgrounded / screen locked).
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") retrack();
+    };
+
+    // Re-announce when the device comes back online (handles cellular drops,
+    // WiFi→cellular handoff, airplane mode toggle, etc.).
+    const onOnline = () => retrack();
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("online", onOnline);
+
+    // Periodic heartbeat to recover from silent WebSocket drops that don't
+    // fire any browser events (common on cellular networks with aggressive NAT).
+    const heartbeat = setInterval(retrack, 30_000);
+
     return () => {
+      clearInterval(heartbeat);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("online", onOnline);
       void channel.untrack().then(() => {
         supabase.removeChannel(channel);
       });
       channelRef.current = null;
     };
-  }, []);
+  }, [retrack]);
 
   return counts;
 }
