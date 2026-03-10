@@ -35,6 +35,25 @@ export function VerificationModal({
 
   const incompleteTotal = incompleteChurches.length;
 
+  // Percentages of state churches missing each core field (for stats row)
+  const coreStats = useMemo(() => {
+    const total = churches.length;
+    if (total === 0) return { total: 0, missingAddressPct: 0, missingServiceTimesPct: 0, missingDenominationPct: 0 };
+    let missingAddress = 0, missingServiceTimes = 0, missingDenomination = 0;
+    for (const ch of churches) {
+      const t1 = getTier1Completeness(ch);
+      if (t1.missingAddress) missingAddress++;
+      if (t1.missingServiceTimes) missingServiceTimes++;
+      if (t1.missingDenomination) missingDenomination++;
+    }
+    return {
+      total,
+      missingAddressPct: Math.round((missingAddress / total) * 100),
+      missingServiceTimesPct: Math.round((missingServiceTimes / total) * 100),
+      missingDenominationPct: Math.round((missingDenomination / total) * 100),
+    };
+  }, [churches]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -76,6 +95,27 @@ export function VerificationModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto min-h-0 px-5 py-3">
+          {churches.length > 0 && (
+            <div className="mb-3">
+              <span className="text-[10px] uppercase tracking-widest text-pink-400/70 font-medium block mb-2">
+                % of churches missing key info
+              </span>
+              <div className="flex gap-1.5">
+                <div className="flex-1 rounded-lg bg-white/4 border border-white/5 px-2 py-2.5 text-center flex flex-col items-center">
+                  <span className="text-white/45 text-[10px] block">Address</span>
+                  <span className="text-white text-[13px] font-semibold tabular-nums mt-0.5">{coreStats.missingAddressPct}%</span>
+                </div>
+                <div className="flex-1 rounded-lg bg-white/4 border border-white/5 px-2 py-2.5 text-center flex flex-col items-center">
+                  <span className="text-white/45 text-[10px] block">Service times</span>
+                  <span className="text-white text-[13px] font-semibold tabular-nums mt-0.5">{coreStats.missingServiceTimesPct}%</span>
+                </div>
+                <div className="flex-1 rounded-lg bg-white/4 border border-white/5 px-2 py-2.5 text-center flex flex-col items-center">
+                  <span className="text-white/45 text-[10px] block">Denomination</span>
+                  <span className="text-white text-[13px] font-semibold tabular-nums mt-0.5">{coreStats.missingDenominationPct}%</span>
+                </div>
+              </div>
+            </div>
+          )}
           <IncompleteChurchesList
             churches={incompleteChurches}
             onChurchClick={(church) => {
@@ -170,9 +210,9 @@ function IncompleteChurchesList({
           {displayed.map((ch) => {
             const t1 = getTier1Completeness(ch);
             const missing: string[] = [];
-            if (t1.missingDenomination) missing.push("Denomination");
             if (t1.missingAddress) missing.push("Address");
             if (t1.missingServiceTimes) missing.push("Service Times");
+            if (t1.missingDenomination) missing.push("Denomination");
 
             return (
               <div
