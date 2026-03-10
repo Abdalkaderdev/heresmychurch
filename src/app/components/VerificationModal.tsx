@@ -178,52 +178,46 @@ function IncompleteChurchesList({
             const noAddress = !ch.address;
             const noServiceTimes = !ch.serviceTimes;
 
+            const missing: string[] = [];
+            if (noDenom) missing.push("Denomination");
+            if (noAddress) missing.push("Address");
+            if (noServiceTimes) missing.push("Service Times");
+
             return (
               <div
                 key={ch.id}
-                className={`rounded-xl bg-white/[0.03] border border-white/6 p-3.5 ${
+                className={`rounded-xl bg-white/[0.03] border border-white/6 px-3.5 py-2.5 ${
                   onChurchClick ? "cursor-pointer hover:bg-white/[0.05] transition-colors group" : ""
                 }`}
                 onClick={() => onChurchClick && onChurchClick(ch)}
               >
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-white text-sm font-medium truncate group-hover:text-purple-300 transition-colors">
-                      {ch.name}
-                    </h3>
-                    {ch.city && (
-                      <span className="text-white/30 text-[11px] flex items-center gap-1 mt-0.5">
-                        <MapPin size={9} />
-                        {ch.city}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-white text-sm font-medium truncate group-hover:text-purple-300 transition-colors">
+                        {ch.name}
+                      </h3>
+                      {ch.city && (
+                        <span className="text-white/25 text-[10px] flex items-center gap-0.5 flex-shrink-0">
+                          <MapPin size={8} />
+                          {ch.city}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      {missing.map((field) => (
+                        <span
+                          key={field}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-pink-500/8 border border-pink-500/15 text-pink-400/70 text-[10px] font-medium"
+                        >
+                          <AlertTriangle size={8} className="flex-shrink-0" />
+                          {field}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   {onChurchClick && (
-                    <ChevronRight size={14} className="text-white/20 mt-1 flex-shrink-0 group-hover:text-white/40 transition-colors" />
-                  )}
-                </div>
-
-                <div className="mt-2.5 space-y-1.5">
-                  {noDenom && (
-                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-pink-500/5 border border-pink-500/10">
-                      <AlertTriangle size={10} className="text-pink-400/60 flex-shrink-0" />
-                      <span className="text-white/50 text-[11px] font-medium">Denomination</span>
-                      <span className="text-pink-400/60 text-[10px] ml-auto font-medium">Missing</span>
-                    </div>
-                  )}
-                  {noAddress && (
-                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-pink-500/5 border border-pink-500/10">
-                      <AlertTriangle size={10} className="text-pink-400/60 flex-shrink-0" />
-                      <span className="text-white/50 text-[11px] font-medium">Address</span>
-                      <span className="text-pink-400/60 text-[10px] ml-auto font-medium">Missing</span>
-                    </div>
-                  )}
-                  {noServiceTimes && (
-                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-pink-500/5 border border-pink-500/10">
-                      <AlertTriangle size={10} className="text-pink-400/60 flex-shrink-0" />
-                      <span className="text-white/50 text-[11px] font-medium">Service Times</span>
-                      <span className="text-pink-400/60 text-[10px] ml-auto font-medium">Missing</span>
-                    </div>
+                    <ChevronRight size={14} className="text-white/20 flex-shrink-0 group-hover:text-white/40 transition-colors" />
                   )}
                 </div>
               </div>

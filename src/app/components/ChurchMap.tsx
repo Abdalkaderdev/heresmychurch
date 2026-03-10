@@ -165,6 +165,8 @@ export function ChurchMap({
           onChurchClick={(church: Church) => {
             localDispatch({ type: "SET", key: "showVerificationModal", value: false });
             if (d.focusedState) navigateToChurch(d.focusedState, church.id);
+            // Defer so the new ChurchDetailPanel mounts before the flag is set
+            setTimeout(() => localDispatch({ type: "SET", key: "forceEditForm", value: true }), 50);
           }}
           onAddChurch={() => {
             localDispatch({ type: "SET", key: "showVerificationModal", value: false });
