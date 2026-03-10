@@ -115,6 +115,23 @@ const DENOMINATION_FACTS: Record<string, string> = {
     "Founded in 1865 by William Booth in London, the Salvation Army is known for its charitable work and military-style organization.",
 };
 
+// Renders time string with a blinking colon (e.g. "9:30 AM" -> "9 : 30 AM")
+function TimeWithBlinkingColon({ time }: { time: string }) {
+  const colonIndex = time.indexOf(":");
+  if (colonIndex === -1) return <>{time}</>;
+  const before = time.slice(0, colonIndex);
+  const after = time.slice(colonIndex + 1);
+  return (
+    <>
+      {before}
+      <span className="animate-colon-blink inline-block w-[0.25em] text-center" aria-hidden>
+        :
+      </span>
+      {after}
+    </>
+  );
+}
+
 // Helper to render service times in a grouped format (primary block)
 function ServiceTimesCard({ serviceTimes }: { serviceTimes: string }) {
   const grouped = groupServiceTimesByDay(parseServiceTimesForDisplay(serviceTimes));
@@ -132,21 +149,21 @@ function ServiceTimesCard({ serviceTimes }: { serviceTimes: string }) {
         )}
       </div>
       {grouped.length > 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {grouped.map((group) => (
-            <div key={group.day} className="flex items-baseline gap-2.5">
-              <span className="text-white/50 text-xs font-semibold flex-shrink-0">
+            <div key={group.day} className="flex items-baseline gap-3">
+              <span className="text-white/50 text-sm font-semibold flex-shrink-0">
                 {group.dayFull.slice(0, 3)}
               </span>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {group.services.map((svc, i) => (
                   <span
                     key={i}
-                    className="px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 text-white/80 border border-purple-500/10"
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-500/10 text-white/80 border border-purple-500/10 tabular-nums"
                   >
-                    {svc.time}
+                    <TimeWithBlinkingColon time={svc.time} />
                     {svc.label && (
-                      <span className="text-white/30 ml-1 text-[10px]">
+                      <span className="text-white/55 ml-1.5 text-xs">
                         {svc.label}
                       </span>
                     )}

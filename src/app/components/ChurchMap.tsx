@@ -367,8 +367,8 @@ function MapArea({
       )}
 
       {!isLoadingVisible && (
-        <div className="absolute left-4 bottom-6 z-20 flex flex-col gap-2 items-start">
-          {d.focusedState && (
+        <div className="absolute left-4 bottom-6 z-30 flex flex-col gap-2 items-start">
+          {(d.focusedState || d.selectedChurch) && (
             <button
               onClick={d.handleResetView}
               title="All States"
@@ -429,7 +429,7 @@ function MapArea({
         />
       )}
 
-      {!isLoadingVisible && (
+      {!isLoadingVisible && !d.showFilterPanel && (
         <MapSearchBar
           churches={d.churches}
           states={d.states}

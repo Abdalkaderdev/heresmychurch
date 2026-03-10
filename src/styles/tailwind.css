@@ -2,3 +2,12 @@
 @source '../**/*.{js,ts,jsx,tsx}';
 
 @import 'tw-animate-css';
+
+@keyframes colon-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+.animate-colon-blink {
+  animation: colon-blink 1s ease-in-out infinite;
+}
