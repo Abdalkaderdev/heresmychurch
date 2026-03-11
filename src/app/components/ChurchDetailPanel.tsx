@@ -331,6 +331,11 @@ export function ChurchDetailPanel({
     }
   }, [church.id]);
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scrollContainerRef.current?.scrollTo(0, 0);
+  }, [church.id]);
+
   // React to external trigger to show edit form
   useEffect(() => {
     if (externalShowEditForm) {
@@ -518,7 +523,7 @@ export function ChurchDetailPanel({
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
         {/* Reaction bar (Netflix-style thumbs) — above service times */}
         {!reactionsLoading && (
           <div className="flex flex-col gap-2">
