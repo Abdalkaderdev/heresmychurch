@@ -58,7 +58,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
             <img src={logoImg} alt="Here's My Church" className="w-full h-full object-cover" />
           </div>
           <h2 className="text-white font-medium text-[22px] leading-tight">Need Help?</h2>
-          <p className="text-white/60 text-sm leading-relaxed mt-3 text-balance">
+          <p className="text-white/60 text-sm leading-relaxed mt-3 text-pretty">
             Get in touch or check the answers below.
           </p>
         </div>

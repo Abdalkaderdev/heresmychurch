@@ -134,7 +134,7 @@ export function SummaryPanel({
         )}
 
         {/* Disclaimer + data source footer */}
-        <div className="pt-2 border-t border-white/5 space-y-1.5 text-balance">
+        <div className="pt-2 border-t border-white/5 space-y-1.5 text-pretty">
           <p className="text-white/30 text-[10px] text-center leading-relaxed italic">
             Not all churches may be represented yet — our goal is for every church to be included.{" "}
             {focusedState

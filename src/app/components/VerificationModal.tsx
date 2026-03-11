@@ -130,7 +130,7 @@ export function VerificationModal({
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 px-5 py-3 border-t border-white/6 text-balance">
+        <div className="flex-shrink-0 px-5 py-3 border-t border-white/6 text-pretty">
           <p className="text-white/25 text-[10px] text-center leading-relaxed">
             Critical fields: address, service times, denomination. Click a church to update its info.
           </p>
@@ -409,7 +409,7 @@ export function NationalReviewModal({ stats, onClose, onSelectState }: NationalR
           )}
         </div>
 
-        <div className="flex-shrink-0 px-5 py-3 border-t border-white/6 text-balance">
+        <div className="flex-shrink-0 px-5 py-3 border-t border-white/6 text-pretty">
           <p className="text-white/25 text-[10px] text-center leading-relaxed">
             Click a state to open its churches needing review. Critical fields: address, service times, denomination.
           </p>

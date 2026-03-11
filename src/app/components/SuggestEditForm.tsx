@@ -309,7 +309,7 @@ export function SuggestEditForm({ church, onClose, focusField, onChurchUpdated }
             )}
 
         {/* Info note */}
-        <div className="pt-3 border-t border-white/5 text-balance">
+        <div className="pt-3 border-t border-white/5 text-pretty">
           <p className="text-white/55 text-[10px] leading-relaxed text-center">
             Your edits are applied immediately. You can update each field
             once per day.

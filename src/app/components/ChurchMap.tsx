@@ -671,7 +671,7 @@ function MapArea({
 
       {!isLoadingVisible && !d.showFilterPanel && !d.showLegend && (
         <div
-          className={`absolute left-6 right-6 md:left-12 md:right-12 z-20 flex flex-col items-center gap-2.5 ${d.selectedChurch ? (isMobile ? "top-[80px] md:top-auto md:bottom-8" : "md:bottom-8") : "bottom-3 md:bottom-8"}`}
+          className={`absolute left-6 right-6 md:left-12 md:right-12 z-40 flex flex-col items-center gap-2.5 ${d.selectedChurch ? (isMobile ? "top-[80px] md:top-auto md:bottom-8" : "md:bottom-8") : "bottom-3 md:bottom-8"}`}
         >
           {/* People with you now — bottom of map; on mobile church view: 8px below top pill */}
           {((activePeople + activeBots) > 1 || (isLocalhost && (activePeople + activeBots) >= 1)) && (() => {
@@ -756,7 +756,7 @@ function HeaderPill({
       >
         <ChurchIcon size={18} className="text-purple-300 flex-shrink-0" />
         {focusedState ? (
-          <span className="text-white text-sm text-balance min-w-0 truncate flex items-center gap-2">
+          <span className="text-white text-sm text-pretty min-w-0 truncate flex items-center gap-2">
             <span className="font-medium">
               {filteredCount.toLocaleString()} churches
             </span>{" "}
@@ -767,7 +767,7 @@ function HeaderPill({
             </span>
           </span>
         ) : (
-          <span className="text-white text-sm text-balance min-w-0 truncate">
+          <span className="text-white text-sm text-pretty min-w-0 truncate">
             <span className="font-medium">
               {totalChurches.toLocaleString()} churches
             </span>{" "}
@@ -866,14 +866,14 @@ function AboutModal({ onClose }: { onClose: () => void }) {
             <img src={logoImg} alt="Here's My Church" className="w-full h-full object-cover" />
           </div>
           <h2 className="text-white font-medium text-[22px] leading-tight">Here's My Church</h2>
-          <p className="text-white/60 text-sm leading-relaxed mt-3 text-balance">An interactive map of Christian churches in the U.S. Find your church or find a new church.</p>
+          <p className="text-white/60 text-sm leading-relaxed mt-3 text-pretty">An interactive map of Christian churches in the U.S. Find your church or find a new church.</p>
         </div>
 
         {/* Content */}
         <div className="px-6 py-5 overflow-y-auto flex-1 min-h-0">
           <div className="flex items-center justify-center gap-2 mb-4 px-3 py-2 rounded-lg bg-white/5">
             <span className="text-purple-300 text-xs">{"\u2726"}</span>
-            <p className="text-white/60 text-xs text-balance">100% free and crowd-sourced</p>
+            <p className="text-white/60 text-xs text-pretty">100% free and crowd-sourced</p>
           </div>
           <p className="text-white/40 text-[11px] uppercase tracking-wider font-medium mb-3">What you can do</p>
           <ul className="space-y-2.5">
@@ -904,7 +904,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
           >
             Start Finding Churches
           </button>
-          <p className="text-white/30 text-[11px] text-center mt-2.5 text-balance">Started by Derek Castelli, who's also building a Bible notes app called <a href="https://harvous.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/50 transition-colors">Harvous</a>. If you need any help email <a href="mailto:hey@heresmychurch.com" className="underline hover:text-white/50 transition-colors">hey@heresmychurch.com</a></p>
+          <p className="text-white/30 text-[11px] text-center mt-2.5 text-pretty">Started by Derek Castelli, who's also building a Bible notes app called <a href="https://harvous.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/50 transition-colors">Harvous</a>. If you need any help email <a href="mailto:hey@heresmychurch.com" className="underline hover:text-white/50 transition-colors">hey@heresmychurch.com</a></p>
         </div>
       </div>
     </div>
