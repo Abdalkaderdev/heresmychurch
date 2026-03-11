@@ -55,6 +55,7 @@ The goal is simple: make it easy for anyone to find a church near them, with dat
 **Data Sources**
 - OpenStreetMap church data with denomination matching
 - ARDA (Association of Religion Data Archives) reference data
+- Regrid parcel data (building square footage) used to improve attendance estimates where available
 - U.S. Census population data
 - Community-submitted churches and corrections
 

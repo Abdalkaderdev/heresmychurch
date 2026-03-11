@@ -28,6 +28,8 @@ export interface Church {
   homeCampus?: HomeCampusSummary;
   bilingualProbability?: number; // 0-1, estimated or user-confirmed
   lastVerified?: number; // timestamp of last correction or confirmation
+  /** Building square footage from Regrid (audit); used to improve attendance estimate. */
+  buildingSqft?: number;
 }
 
 /** Minimal church info for cross-state main campus link (from API). */
@@ -96,6 +98,9 @@ function isAddressMeaningful(
 /** Diagonal (degrees) below which we skip quadrant and show only state name. */
 const QUADRANT_MIN_DIAGONAL = 2;
 
+/** Fraction of half-diagonal from state center; points within this are labeled "Central". */
+const CENTRAL_RADIUS_FRACTION = 0.2;
+
 function getQuadrantLabel(
   lat: number,
   lng: number,
@@ -109,9 +114,25 @@ function getQuadrantLabel(
   return `${ns}${ew}`;
 }
 
+/** True if (lat, lng) is within the "central" zone of the state (near geographic center). */
+function isInCentralZone(
+  lat: number,
+  lng: number,
+  bounds: [number, number, number, number],
+  diagonal: number
+): boolean {
+  const [south, west, north, east] = bounds;
+  const midLat = (south + north) / 2;
+  const midLng = (west + east) / 2;
+  const halfDiagonal = diagonal / 2;
+  const radius = halfDiagonal * CENTRAL_RADIUS_FRACTION;
+  const dist = Math.sqrt((lat - midLat) ** 2 + (lng - midLng) ** 2);
+  return dist <= radius;
+}
+
 /**
  * Returns a fallback location string when a church has no complete address/city,
- * e.g. "Somewhere in NW Iowa". Use when address and city are both missing or not meaningful.
+ * e.g. "Somewhere in Central Iowa" or "Somewhere in NW Iowa". Use when address and city are both missing or not meaningful.
  * Returns null if city is present (caller should use city as fallback) or state is unknown.
  */
 export function getFallbackLocation(church: {
@@ -131,6 +152,9 @@ export function getFallbackLocation(church: {
   const lngSpan = east - west;
   const diagonal = Math.sqrt(latSpan * latSpan + lngSpan * lngSpan);
   if (diagonal < QUADRANT_MIN_DIAGONAL) return `Somewhere in ${stateName}`;
+  if (isInCentralZone(church.lat, church.lng, bounds, diagonal)) {
+    return `Somewhere in Central ${stateName}`;
+  }
   const quadrant = getQuadrantLabel(church.lat, church.lng, bounds);
   return `Somewhere in ${quadrant} ${stateName}`;
 }

@@ -144,6 +144,7 @@ export function SummaryPanel({
           <p className="text-white/20 text-[10px] text-center leading-relaxed">
             Church data from OpenStreetMap via Overpass API{" "}&middot;{" "}
             Cross-referenced with The Association of Religion Data Archives (ARDA){" "}&middot;{" "}
+            Regrid parcel data for attendance estimates{" "}&middot;{" "}
             Population from U.S. Census Bureau{" "}&middot;{" "}
             Boundaries from Natural Earth / U.S. Census TIGER
           </p>
