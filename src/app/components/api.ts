@@ -493,8 +493,11 @@ export async function confirmChurchData(churchId: string): Promise<{ success: bo
   return res.json();
 }
 
-export async function fetchCommunityStats(): Promise<CommunityStats> {
-  const res = await fetchWithRetry(`${BASE_URL}/community/stats`, { headers });
+export async function fetchCommunityStats(stateAbbrev?: string): Promise<CommunityStats> {
+  const url = stateAbbrev
+    ? `${BASE_URL}/community/stats?state=${encodeURIComponent(stateAbbrev)}`
+    : `${BASE_URL}/community/stats`;
+  const res = await fetchWithRetry(url, { headers });
   if (!res.ok) throw new Error(`Failed to fetch stats: ${res.status}`);
   return res.json();
 }

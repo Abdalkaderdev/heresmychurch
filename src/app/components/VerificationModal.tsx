@@ -1,19 +1,59 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "motion/react";
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
   ChevronRight,
+  Church as ChurchIcon,
   MapPin,
-  Search,
   Plus,
+  Search,
+  ShieldCheck,
 } from "lucide-react";
 import type { Church } from "./church-data";
 import { CloseButton } from "./ui/close-button";
 import { churchNeedsReview, getTier1Completeness } from "./church-data";
-import type { NationalReviewStatsResponse } from "./api";
+import { fetchCommunityStats, type CommunityStats, type NationalReviewStatsResponse } from "./api";
 import { StateFlag } from "./StateFlag";
 import { STATE_NAMES } from "./map-constants";
+
+// Green Community Impact block (national or state-scoped)
+function CommunityImpactCard({
+  stateAbbrev,
+  className = "",
+}: {
+  stateAbbrev?: string;
+  className?: string;
+}) {
+  const [stats, setStats] = useState<CommunityStats | null>(null);
+  useEffect(() => {
+    fetchCommunityStats(stateAbbrev).then(setStats).catch(() => {});
+  }, [stateAbbrev]);
+  if (!stats || (stats.totalCorrections === 0 && stats.churchesImproved === 0)) return null;
+  return (
+    <div className={`rounded-xl bg-green-500/5 border border-green-500/10 px-4 py-3.5 ${className}`.trim()}>
+      <div className="flex items-center gap-2 mb-2">
+        <ShieldCheck size={12} className="text-green-400 flex-shrink-0" />
+        <span className="text-[10px] uppercase tracking-widest text-green-400/70 font-medium block">Community Impact</span>
+      </div>
+      <div className="flex items-center gap-x-4 gap-y-2 text-sm flex-wrap">
+        {stats.totalCorrections > 0 && (
+          <span className="flex items-center gap-2 text-white/50 whitespace-nowrap flex-shrink-0">
+            <Check size={16} className="text-green-400/60 flex-shrink-0" />
+            <span className="text-white/70 font-medium">{stats.totalCorrections}</span> corrections
+          </span>
+        )}
+        {stats.churchesImproved > 0 && (
+          <span className="flex items-center gap-2 text-white/50 whitespace-nowrap flex-shrink-0">
+            <ChurchIcon size={16} className="text-green-400/60 flex-shrink-0" />
+            <span className="text-white/70 font-medium">{stats.churchesImproved}</span> churches improved
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface VerificationModalProps {
   stateAbbrev: string;
@@ -29,6 +69,7 @@ interface VerificationModalProps {
 }
 
 export function VerificationModal({
+  stateAbbrev,
   stateName,
   churches,
   selectedChurch,
@@ -36,35 +77,10 @@ export function VerificationModal({
   onChurchClick,
   onAddChurch,
 }: VerificationModalProps) {
-  // Use best available data for stats: merge selectedChurch into list when it's in this state so percentages reflect edits/detail data
-  const churchesForStats = useMemo(() => {
-    if (!selectedChurch || !churches.some((c) => c.id === selectedChurch.id)) return churches;
-    return churches.map((ch) => (ch.id === selectedChurch.id ? selectedChurch : ch));
-  }, [churches, selectedChurch]);
-
   // Churches that need review: missing 2+ of address, service times, denomination
   const incompleteChurches = useMemo(() => churches.filter(churchNeedsReview), [churches]);
 
   const incompleteTotal = incompleteChurches.length;
-
-  // Percentages of *all* state churches missing each core field (denominator = full list; use churchesForStats so selected church's real data counts)
-  const coreStats = useMemo(() => {
-    const total = churchesForStats.length;
-    if (total === 0) return { total: 0, missingAddressPct: 0, missingServiceTimesPct: 0, missingDenominationPct: 0 };
-    let missingAddress = 0, missingServiceTimes = 0, missingDenomination = 0;
-    for (const ch of churchesForStats) {
-      const t1 = getTier1Completeness(ch);
-      if (t1.missingAddress) missingAddress++;
-      if (t1.missingServiceTimes) missingServiceTimes++;
-      if (t1.missingDenomination) missingDenomination++;
-    }
-    return {
-      total,
-      missingAddressPct: total > 0 ? (missingAddress / total) * 100 : 0,
-      missingServiceTimesPct: total > 0 ? (missingServiceTimes / total) * 100 : 0,
-      missingDenominationPct: total > 0 ? (missingDenomination / total) * 100 : 0,
-    };
-  }, [churchesForStats]);
 
   return (
     <div
@@ -89,7 +105,7 @@ export function VerificationModal({
               <AlertTriangle size={18} className="text-white" />
             </div>
             <div>
-              <h2 className="text-white font-medium text-base leading-tight">
+              <h2 className="text-white font-semibold text-lg leading-tight">
                 Churches Needing Review
               </h2>
               <p className="text-white/40 text-xs mt-0.5">
@@ -102,27 +118,7 @@ export function VerificationModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto min-h-0 px-5 py-3">
-          {churches.length > 0 && (
-            <div className="mb-3">
-              <span className="text-[10px] uppercase tracking-widest text-pink-400/70 font-medium block mb-2">
-                % of churches missing key info
-              </span>
-              <div className="flex gap-1.5">
-                <div className="flex-1 rounded-lg bg-white/4 border border-white/5 px-2 py-2.5 text-center flex flex-col items-center">
-                  <span className="text-white/45 text-[10px] block">Address</span>
-                  <span className="text-white text-[13px] font-semibold tabular-nums mt-0.5">{coreStats.missingAddressPct.toFixed(1)}%</span>
-                </div>
-                <div className="flex-1 rounded-lg bg-white/4 border border-white/5 px-2 py-2.5 text-center flex flex-col items-center">
-                  <span className="text-white/45 text-[10px] block">Service times</span>
-                  <span className="text-white text-[13px] font-semibold tabular-nums mt-0.5">{coreStats.missingServiceTimesPct.toFixed(1)}%</span>
-                </div>
-                <div className="flex-1 rounded-lg bg-white/4 border border-white/5 px-2 py-2.5 text-center flex flex-col items-center">
-                  <span className="text-white/45 text-[10px] block">Denomination</span>
-                  <span className="text-white text-[13px] font-semibold tabular-nums mt-0.5">{coreStats.missingDenominationPct.toFixed(1)}%</span>
-                </div>
-              </div>
-            </div>
-          )}
+          <CommunityImpactCard stateAbbrev={stateAbbrev} className="mb-3" />
           <IncompleteChurchesList
             churches={incompleteChurches}
             onChurchClick={(church) => {
@@ -186,7 +182,7 @@ function IncompleteChurchesList({
   return (
     <div className="space-y-2">
       {/* Search input */}
-      <div className="relative mb-1">
+      <div className="relative mb-3">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
         <input
           type="text"
@@ -282,17 +278,17 @@ export interface NationalReviewModalProps {
 
 export function NationalReviewModal({ stats, onClose, onSelectState }: NationalReviewModalProps) {
   const [search, setSearch] = useState("");
-  const totalChurches = stats?.totalChurches || 1;
-  const missingAddressPct = stats ? (stats.missingAddress / totalChurches) * 100 : 0;
-  const missingServiceTimesPct = stats ? (stats.missingServiceTimes / totalChurches) * 100 : 0;
-  const missingDenominationPct = stats ? (stats.missingDenomination / totalChurches) * 100 : 0;
 
   const stateEntries = useMemo(
     () =>
       stats
         ? Object.entries(stats.states)
             .filter(([, s]) => s.needsReview > 0)
-            .sort((a, b) => b[1].needsReview - a[1].needsReview)
+            .sort((a, b) => {
+              const pctA = a[1].total > 0 ? a[1].needsReview / a[1].total : 0;
+              const pctB = b[1].total > 0 ? b[1].needsReview / b[1].total : 0;
+              return pctB - pctA; // descending by percentage
+            })
         : [],
     [stats]
   );
@@ -329,7 +325,7 @@ export function NationalReviewModal({ stats, onClose, onSelectState }: NationalR
               <AlertTriangle size={18} className="text-white" />
             </div>
             <div>
-              <h2 className="text-white font-medium text-base leading-tight">
+              <h2 className="text-white font-semibold text-lg leading-tight">
                 States Needing Review
               </h2>
               <p className="text-white/40 text-xs mt-0.5">
@@ -355,35 +351,17 @@ export function NationalReviewModal({ stats, onClose, onSelectState }: NationalR
             </div>
           ) : (
             <>
-              <div className="mb-3">
-                <span className="text-[10px] uppercase tracking-widest text-pink-400/70 font-medium block mb-2">
-                  % of churches missing key info (national)
-                </span>
-                <div className="flex gap-1.5">
-                  <div className="flex-1 rounded-lg bg-white/4 border border-white/5 px-2 py-2.5 text-center flex flex-col items-center">
-                    <span className="text-white/45 text-[10px] block">Address</span>
-                    <span className="text-white text-[13px] font-semibold tabular-nums mt-0.5">{missingAddressPct.toFixed(1)}%</span>
-                  </div>
-                  <div className="flex-1 rounded-lg bg-white/4 border border-white/5 px-2 py-2.5 text-center flex flex-col items-center">
-                    <span className="text-white/45 text-[10px] block">Service times</span>
-                    <span className="text-white text-[13px] font-semibold tabular-nums mt-0.5">{missingServiceTimesPct.toFixed(1)}%</span>
-                  </div>
-                  <div className="flex-1 rounded-lg bg-white/4 border border-white/5 px-2 py-2.5 text-center flex flex-col items-center">
-                    <span className="text-white/45 text-[10px] block">Denomination</span>
-                    <span className="text-white text-[13px] font-semibold tabular-nums mt-0.5">{missingDenominationPct.toFixed(1)}%</span>
-                  </div>
-                </div>
-              </div>
+              <CommunityImpactCard className="mb-3" />
 
               <div className="space-y-2">
-                <div className="relative mb-1">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                <div className="relative mb-3">
+                  <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
                   <input
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search states..."
-                    className="w-full pl-9 pr-3 py-2 rounded-full bg-white/[0.05] border border-white/8 text-white text-xs placeholder:text-white/25 focus:outline-none focus:border-purple-500/40 transition-colors"
+                    className="w-full pl-10 pr-3 py-3 rounded-full bg-white/[0.05] border border-white/8 text-white text-[15px] placeholder:text-white/25 focus:outline-none focus:border-purple-500/40 transition-colors"
                   />
                 </div>
 

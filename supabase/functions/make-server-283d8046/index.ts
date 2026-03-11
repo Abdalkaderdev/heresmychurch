@@ -813,8 +813,18 @@ app.post(`${P}/churches/confirm/:churchId`,async(c)=>{
 
 app.get(`${P}/community/stats`,async(c)=>{
   try{
+    const state=(c.req.query("state")||"").toString().toUpperCase();
     const stats=(await kv.get("community:stats"))||{totalCorrections:0,churchesImproved:[],totalConfirmations:0,corrections:[],lastUpdated:null};
-    return c.json({totalCorrections:stats.totalCorrections||0,churchesImproved:Array.isArray(stats.churchesImproved)?stats.churchesImproved.length:0,totalConfirmations:stats.totalConfirmations||0,lastUpdated:stats.lastUpdated});
+    const corrections=Array.isArray(stats.corrections)?stats.corrections:[];
+    const improved=Array.isArray(stats.churchesImproved)?stats.churchesImproved:[];
+    if(state&&state.length===2){
+      const prefix1=state+"-";const prefix2="community-"+state+"-";
+      const match=(id: string)=>id.startsWith(prefix1)||id.startsWith(prefix2);
+      const stateCorrections=corrections.filter((h: any)=>h&&match(String(h.churchId||"")));
+      const stateImproved=improved.filter((id: string)=>match(String(id)));
+      return c.json({totalCorrections:stateCorrections.length,churchesImproved:stateImproved.length,totalConfirmations:0,lastUpdated:stats.lastUpdated});
+    }
+    return c.json({totalCorrections:stats.totalCorrections||0,churchesImproved:improved.length,totalConfirmations:stats.totalConfirmations||0,lastUpdated:stats.lastUpdated});
   }catch(e){return c.json({totalCorrections:0,churchesImproved:0,totalConfirmations:0,error:`${e}`},500);}
 });
 

@@ -373,21 +373,21 @@ function CommunityStatsCard() {
   }, []);
   if (!stats || (stats.totalCorrections === 0 && stats.churchesImproved === 0)) return null;
   return (
-    <div className="rounded-lg bg-green-500/5 border border-green-500/10 px-3 py-2.5">
-      <div className="flex items-center gap-2 mb-1.5">
-        <ShieldCheck size={14} className="text-green-400 flex-shrink-0" />
-        <span className="text-[10px] uppercase tracking-wider text-green-400/70 font-medium">Community Impact</span>
+    <div className="rounded-xl bg-green-500/5 border border-green-500/10 px-4 py-3.5">
+      <div className="flex items-center gap-2 mb-2">
+        <ShieldCheck size={12} className="text-green-400 flex-shrink-0" />
+        <span className="text-[10px] uppercase tracking-widest text-green-400/70 font-medium block">Community Impact</span>
       </div>
-      <div className="flex items-center gap-3 text-[11px] flex-wrap">
+      <div className="flex items-center gap-x-4 gap-y-2 text-sm flex-wrap">
         {stats.totalCorrections > 0 && (
-          <span className="flex items-center gap-1.5 text-white/50 whitespace-nowrap flex-shrink-0">
-            <Check size={14} className="text-green-400/60 flex-shrink-0" />
+          <span className="flex items-center gap-2 text-white/50 whitespace-nowrap flex-shrink-0">
+            <Check size={16} className="text-green-400/60 flex-shrink-0" />
             <span className="text-white/70 font-medium">{stats.totalCorrections}</span> corrections
           </span>
         )}
         {stats.churchesImproved > 0 && (
-          <span className="flex items-center gap-1.5 text-white/50 whitespace-nowrap flex-shrink-0">
-            <ChurchIcon size={14} className="text-green-400/60 flex-shrink-0" />
+          <span className="flex items-center gap-2 text-white/50 whitespace-nowrap flex-shrink-0">
+            <ChurchIcon size={16} className="text-green-400/60 flex-shrink-0" />
             <span className="text-white/70 font-medium">{stats.churchesImproved}</span> churches improved
           </span>
         )}
