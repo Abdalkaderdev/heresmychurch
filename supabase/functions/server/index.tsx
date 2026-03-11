@@ -490,9 +490,13 @@ app.post(`${P}/churches/populate/:state`,async(c)=>{
     let communityCount=0;
     if(pending&&Array.isArray(pending.churches)){
       const osmIds=new Set(ch.map((x:any)=>x.id));
+      const existingShortIds=new Set(ch.map((x:any)=>x.shortId).filter(Boolean));
       for(const pc of pending.churches){
         if(pc.approved&&pc.id?.startsWith("community-")&&!osmIds.has(pc.id)){
-          const churchForMain={id:pc.id,shortId:pc.shortId,name:pc.name,address:pc.address||"",city:pc.city||"",state:st,lat:pc.lat,lng:pc.lng,denomination:pc.denomination||"Unknown",attendance:pc.attendance||50,website:pc.website||"",serviceTimes:pc.serviceTimes,languages:pc.languages,ministries:pc.ministries,pastorName:pc.pastorName,phone:pc.phone,email:pc.email,lastVerified:pc.submittedAt||Date.now()};
+          let sid=pc.shortId;
+          if(!sid){do{sid=Math.floor(10000000+Math.random()*90000000).toString();}while(existingShortIds.has(sid));}
+          existingShortIds.add(sid);
+          const churchForMain={id:pc.id,shortId:sid,name:pc.name,address:pc.address||"",city:pc.city||"",state:st,lat:pc.lat,lng:pc.lng,denomination:pc.denomination||"Unknown",attendance:pc.attendance||50,website:pc.website||"",serviceTimes:pc.serviceTimes,languages:pc.languages,ministries:pc.ministries,pastorName:pc.pastorName,phone:pc.phone,email:pc.email,lastVerified:pc.submittedAt||Date.now()};
           ch.push(churchForMain);communityCount++;
         }
       }
