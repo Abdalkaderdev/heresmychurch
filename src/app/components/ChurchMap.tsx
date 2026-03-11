@@ -38,6 +38,7 @@ import { fetchNationalReviewStats } from "./api";
 import type { NationalReviewStatsResponse } from "./api";
 import { useIsMobile } from "./ui/use-mobile";
 import { PendingAlertsPill } from "./PendingAlertsPill";
+import { reportIssueEnabled } from "../config/pendingAlerts";
 import { useReducer, useEffect, useMemo, useState } from "react";
 import logoImg from "../../assets/a94bce1cf0860483364d5d9c353899b7da8233e7.png";
 
@@ -110,6 +111,7 @@ export function ChurchMap({
     showAbout: !hasSeenAbout && !routeStateAbbrev,
     showHelp: false,
     showAlertsPanel: false,
+  alertsPanelOpenedViaReportIssue: false,
   });
 
   const anyOverlayOpen = d.showSummary || d.showFilterPanel || d.showLegend || local.showAlertsPanel || (isNationalView && isMobile && !effectiveSearchCollapsed);
@@ -119,6 +121,7 @@ export function ChurchMap({
     d.setShowLegend(false);
     d.setSearchCollapsed(true);
     localDispatch({ type: "SET", key: "showAlertsPanel", value: false });
+    localDispatch({ type: "SET", key: "alertsPanelOpenedViaReportIssue", value: false });
   };
 
   const dismissAbout = () => {
@@ -226,8 +229,18 @@ export function ChurchMap({
         showHelp={local.showHelp}
         onDismissHelp={onDismissHelp}
         onShowHelp={onShowHelp}
+        showReportIssue={reportIssueEnabled}
+        onReportIssue={reportIssueEnabled ? () => {
+          onDismissHelp();
+          localDispatch({ type: "SET", key: "alertsPanelOpenedViaReportIssue", value: true });
+          localDispatch({ type: "SET", key: "showAlertsPanel", value: true });
+        } : undefined}
         showAlertsPanel={local.showAlertsPanel}
-        onAlertsPanelChange={(open) => localDispatch({ type: "SET", key: "showAlertsPanel", value: open })}
+        showProposeForm={local.alertsPanelOpenedViaReportIssue}
+        onAlertsPanelChange={(open) => {
+          localDispatch({ type: "SET", key: "showAlertsPanel", value: open });
+          if (!open) localDispatch({ type: "SET", key: "alertsPanelOpenedViaReportIssue", value: false });
+        }}
         activePeople={activePeople}
         activeBots={activeBots}
         isLocalhost={isLocalhost}
@@ -378,6 +391,7 @@ type LocalState = {
   showAbout: boolean;
   showHelp: boolean;
   showAlertsPanel: boolean;
+  alertsPanelOpenedViaReportIssue: boolean;
 };
 type LocalAction = { type: "SET"; key: keyof LocalState; value: any };
 function localReducer(state: LocalState, action: LocalAction): LocalState {
@@ -407,7 +421,10 @@ function MapArea({
   showHelp,
   onDismissHelp,
   onShowHelp,
+  showReportIssue,
+  onReportIssue,
   showAlertsPanel,
+  showProposeForm,
   onAlertsPanelChange,
   activePeople,
   activeBots,
@@ -435,7 +452,10 @@ function MapArea({
   showHelp: boolean;
   onDismissHelp: () => void;
   onShowHelp: () => void;
+  showReportIssue: boolean;
+  onReportIssue?: () => void;
   showAlertsPanel: boolean;
+  showProposeForm: boolean;
   onAlertsPanelChange: (open: boolean) => void;
   activePeople: number;
   activeBots: number;
@@ -470,12 +490,14 @@ function MapArea({
             }}
           />
 
-          {/* Pending errors — below header pill; you control content via config */}
+          {/* Pending errors — below header pill */}
           {!d.showSummary && (
             <div className="mt-1.5">
               <PendingAlertsPill
                 open={showAlertsPanel}
                 onOpenChange={onAlertsPanelChange}
+                showProposeForm={showProposeForm}
+                showReportIssue={showReportIssue}
               />
             </div>
           )}
@@ -516,7 +538,13 @@ function MapArea({
       {showAbout && <AboutModal onClose={onDismissAbout} />}
 
       {/* Help Modal */}
-      {showHelp && <HelpModal onClose={onDismissHelp} />}
+      {showHelp && (
+        <HelpModal
+          onClose={onDismissHelp}
+          showReportIssue={showReportIssue}
+          onReportIssue={onReportIssue}
+        />
+      )}
 
       {/* Map canvas */}
       <MapCanvas

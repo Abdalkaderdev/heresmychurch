@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, Copy, Check } from "lucide-react";
+import { Mail, Copy, Check, AlertCircle } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -7,6 +7,7 @@ import {
   AccordionTrigger,
 } from "./ui/accordion";
 import { CloseButton } from "./ui/close-button";
+import { reportErrorsContact } from "../config/pendingAlerts";
 import logoImg from "../../assets/a94bce1cf0860483364d5d9c353899b7da8233e7.png";
 
 const EMAIL = "hey@heresmychurch.com";
@@ -25,7 +26,15 @@ function XLogoIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-export function HelpModal({ onClose }: { onClose: () => void }) {
+export function HelpModal({
+  onClose,
+  showReportIssue = true,
+  onReportIssue,
+}: {
+  onClose: () => void;
+  showReportIssue?: boolean;
+  onReportIssue?: () => void;
+}) {
   const [copiedEmail, setCopiedEmail] = useState(false);
 
   const handleCopyEmail = (e: React.MouseEvent) => {
@@ -65,7 +74,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
 
         <div className="px-6 py-5 overflow-y-auto flex-1 min-h-0">
           <p className="text-white/40 text-[11px] uppercase tracking-wider font-medium mb-3">
-            Contact
+            Contact & report
           </p>
           <div className="flex flex-wrap gap-2 mb-5">
             <div
@@ -91,6 +100,28 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 )}
               </button>
             </div>
+            {showReportIssue &&
+              (onReportIssue ? (
+                <button
+                  type="button"
+                  onClick={onReportIssue}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium text-white/70 bg-white/8 hover:bg-white/12 transition-colors"
+                >
+                  <AlertCircle size={14} className="flex-shrink-0" />
+                  {reportErrorsContact.label}
+                </button>
+              ) : (
+                reportErrorsContact.mailto && (
+                  <a
+                    href={`mailto:${reportErrorsContact.mailto}?subject=Issue%20report`}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium text-white/70 bg-white/8 hover:bg-white/12 transition-colors"
+                  >
+                    <AlertCircle size={14} className="flex-shrink-0" />
+                    {reportErrorsContact.label}
+                  </a>
+                )
+              ))
+            }
             <a
               href="https://x.com/heresmychurch"
               target="_blank"

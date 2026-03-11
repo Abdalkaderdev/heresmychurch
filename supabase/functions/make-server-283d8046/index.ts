@@ -735,6 +735,7 @@ app.post(`${P}/admin/cleanup-blocked-denominations`,async(c)=>{
 
 // ── Community routes ──
 const THR=1;
+const ALERT_THR=3;
 function cip(c:any):string{return c.req.header("x-forwarded-for")?.split(",")[0]?.trim()||c.req.header("x-real-ip")||"unknown";}
 function normalizePhone(s:string):string{
   const digits=(s??"").replace(/\D/g,"");
@@ -933,6 +934,107 @@ app.get(`${P}/suggestions/:churchId`,async(c)=>{
     return c.json({churchId:id,consensus:con,myVotes:my,totalSubmissions:subs.length});
   }catch(e){return c.json({error:`${e}`},500);}
 });
+
+// ── Community-managed alerts (create/resolve by voting) ──
+const ALERTS_ACTIVE_KEY="alerts:active";
+const ALERTS_PROPOSALS_CREATE_KEY="alerts:proposals:create";
+const ALERTS_PROPOSALS_RESOLVE_KEY="alerts:proposals:resolve";
+
+const alertsActiveHandler=async(c:any)=>{
+  try{
+    const raw=await kv.get(ALERTS_ACTIVE_KEY);
+    const list=Array.isArray(raw)?raw:[];
+    const alerts=list.filter((a:any)=>!a.resolved).map((a:any)=>({id:a.id,shortLabel:a.shortLabel,description:a.description,resolved:!!a.resolved,createdAt:a.createdAt,source:a.source||"community"}));
+    return c.json({alerts});
+  }catch(e){return c.json({alerts:[],error:String(e)},500);}
+};
+app.get(`${P}/alerts/active`,alertsActiveHandler);
+app.get("/alerts/active",alertsActiveHandler);
+
+const alertsProposalsHandler=async(c:any)=>{
+  try{
+    const ip=cip(c);
+    const createRaw=await kv.get(ALERTS_PROPOSALS_CREATE_KEY);
+    const resolveRaw=await kv.get(ALERTS_PROPOSALS_RESOLVE_KEY);
+    const createList=Array.isArray(createRaw)?createRaw:[];
+    const resolveList=Array.isArray(resolveRaw)?resolveRaw:[];
+    const create=createList.map((p:any)=>{
+      const votes=Array.isArray(p.votes)?p.votes:[];
+      const myVote=votes.some((v:any)=>v.ip===ip);
+      return{id:p.id,shortLabel:p.shortLabel,description:p.description,votes:votes.length,needed:ALERT_THR,myVote,createdAt:p.createdAt};
+    });
+    const resolve=resolveList.map((p:any)=>{
+      const votes=Array.isArray(p.votes)?p.votes:[];
+      const myVote=votes.some((v:any)=>v.ip===ip);
+      return{alertId:p.alertId,votes:votes.length,needed:ALERT_THR,myVote,createdAt:p.createdAt};
+    });
+    return c.json({create,resolve});
+  }catch(e){return c.json({create:[],resolve:[],error:String(e)},500);}
+};
+app.get(`${P}/alerts/proposals`,alertsProposalsHandler);
+app.get("/alerts/proposals",alertsProposalsHandler);
+
+async function promoteCreateProposal(proposal:any,activeList:any[]):Promise<void>{
+  const next={id:proposal.id,shortLabel:proposal.shortLabel,description:proposal.description,resolved:false,createdAt:proposal.createdAt||Date.now(),source:"community"};
+  activeList.push(next);
+  await kv.set(ALERTS_ACTIVE_KEY,activeList);
+}
+
+const alertsProposalsCreateHandler=async(c:any)=>{
+  try{
+    const ip=cip(c);const b=await c.req.json();
+    const shortLabel=typeof b?.shortLabel==="string"?b.shortLabel.trim():"";const description=typeof b?.description==="string"?b.description.trim():"";
+    if(!shortLabel||shortLabel.length<1)return c.json({error:"shortLabel required"},400);
+    const id=crypto.randomUUID();
+    const ts=Date.now();
+    const createRaw=await kv.get(ALERTS_PROPOSALS_CREATE_KEY);const createList=Array.isArray(createRaw)?createRaw:[];
+    const proposal={id,shortLabel,description,votes:[{ip,ts}],createdAt:ts};
+    createList.push(proposal);await kv.set(ALERTS_PROPOSALS_CREATE_KEY,createList);
+    const activeRaw=await kv.get(ALERTS_ACTIVE_KEY);const activeList=Array.isArray(activeRaw)?activeRaw:[];
+    if(proposal.votes.length>=ALERT_THR){createList.pop();await kv.set(ALERTS_PROPOSALS_CREATE_KEY,createList);await promoteCreateProposal(proposal,activeList);}
+    const createOut=createList.map((p:any)=>({id:p.id,shortLabel:p.shortLabel,description:p.description,votes:p.votes?.length??0,needed:ALERT_THR,myVote:p.votes?.some((v:any)=>v.ip===ip),createdAt:p.createdAt}));
+    return c.json({success:true,proposals:{create:createOut},promoted:proposal.votes.length>=ALERT_THR});
+  }catch(e){return c.json({error:String(e)},500);}
+};
+app.post(`${P}/alerts/proposals/create`,alertsProposalsCreateHandler);
+app.post("/alerts/proposals/create",alertsProposalsCreateHandler);
+
+const alertsProposalsVoteHandler=async(c:any)=>{
+  try{
+    const ip=cip(c);const proposalId=c.req.param("id");
+    const createRaw=await kv.get(ALERTS_PROPOSALS_CREATE_KEY);const createList=Array.isArray(createRaw)?createRaw:[];
+    const idx=createList.findIndex((p:any)=>p.id===proposalId);if(idx<0)return c.json({error:"Proposal not found"},404);
+    const p=createList[idx];if(!Array.isArray(p.votes))p.votes=[];if(p.votes.some((v:any)=>v.ip===ip))return c.json({success:true,alreadyVoted:true});
+    p.votes.push({ip,ts:Date.now()});
+    const activeRaw=await kv.get(ALERTS_ACTIVE_KEY);let activeList=Array.isArray(activeRaw)?activeRaw:[];
+    if(p.votes.length>=ALERT_THR){createList.splice(idx,1);await kv.set(ALERTS_PROPOSALS_CREATE_KEY,createList);await promoteCreateProposal(p,activeList);}
+    else{await kv.set(ALERTS_PROPOSALS_CREATE_KEY,createList);}
+    const createOut=createList.map((x:any)=>({id:x.id,shortLabel:x.shortLabel,description:x.description,votes:x.votes?.length??0,needed:ALERT_THR,myVote:x.votes?.some((v:any)=>v.ip===ip),createdAt:x.createdAt}));
+    const alerts=activeList.filter((a:any)=>!a.resolved).map((a:any)=>({id:a.id,shortLabel:a.shortLabel,description:a.description,resolved:!!a.resolved,createdAt:a.createdAt,source:a.source||"community"}));
+    return c.json({success:true,proposals:{create:createOut},alerts,promoted:p.votes.length>=ALERT_THR});
+  }catch(e){return c.json({error:String(e)},500);}
+};
+app.post(`${P}/alerts/proposals/create/:id/vote`,alertsProposalsVoteHandler);
+app.post("/alerts/proposals/create/:id/vote",alertsProposalsVoteHandler);
+
+const alertsProposalsResolveHandler=async(c:any)=>{
+  try{
+    const ip=cip(c);const b=await c.req.json();
+    const alertId=typeof b?.alertId==="string"?b.alertId.trim():"";if(!alertId)return c.json({error:"alertId required"},400);
+    const ts=Date.now();
+    const resolveRaw=await kv.get(ALERTS_PROPOSALS_RESOLVE_KEY);const resolveList=Array.isArray(resolveRaw)?resolveRaw:[];
+    let r=resolveList.find((x:any)=>x.alertId===alertId);
+    if(!r){r={alertId,votes:[{ip,ts}],createdAt:ts};resolveList.push(r);}else{if(!Array.isArray(r.votes))r.votes=[];if(r.votes.some((v:any)=>v.ip===ip))return c.json({success:true,alreadyVoted:true});r.votes.push({ip,ts});}
+    const activeRaw=await kv.get(ALERTS_ACTIVE_KEY);const activeList=Array.isArray(activeRaw)?activeRaw:[];
+    if(r.votes.length>=ALERT_THR){const ai=activeList.findIndex((a:any)=>a.id===alertId);if(ai>=0){activeList[ai].resolved=true;}resolveList.splice(resolveList.indexOf(r),1);await kv.set(ALERTS_PROPOSALS_RESOLVE_KEY,resolveList);await kv.set(ALERTS_ACTIVE_KEY,activeList);}
+    else{await kv.set(ALERTS_PROPOSALS_RESOLVE_KEY,resolveList);}
+    const alerts=activeList.filter((a:any)=>!a.resolved).map((a:any)=>({id:a.id,shortLabel:a.shortLabel,description:a.description,resolved:!!a.resolved,createdAt:a.createdAt,source:a.source||"community"}));
+    const resolveOut=resolveList.map((x:any)=>({alertId:x.alertId,votes:x.votes?.length??0,needed:ALERT_THR,myVote:x.votes?.some((v:any)=>v.ip===ip),createdAt:x.createdAt}));
+    return c.json({success:true,alerts,proposals:{resolve:resolveOut}});
+  }catch(e){return c.json({error:String(e)},500);}
+};
+app.post(`${P}/alerts/proposals/resolve`,alertsProposalsResolveHandler);
+app.post("/alerts/proposals/resolve",alertsProposalsResolveHandler);
 
 app.post(`${P}/churches/add`,async(c)=>{
   try{

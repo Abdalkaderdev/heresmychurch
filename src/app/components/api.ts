@@ -613,3 +613,142 @@ export async function fetchStatePopulations(): Promise<PopulationResponse> {
   }
   return res.json();
 }
+
+// ── Community-managed alerts ──
+
+async function parseAlertsResponse(res: Response): Promise<unknown> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error(
+      `Alerts API returned invalid JSON (${res.status}): ${text.slice(0, 150)}`
+    );
+  }
+}
+
+export interface CommunityAlert {
+  id: string;
+  shortLabel: string;
+  description: string;
+  /** Optional: e.g. "1–2 days", "2 weeks" — shown below the description. */
+  estimatedResolution?: string;
+  resolved: boolean;
+  createdAt?: number;
+  source?: "community";
+}
+
+export interface AlertsActiveResponse {
+  alerts: CommunityAlert[];
+  error?: string;
+}
+
+export interface AlertCreateProposal {
+  id: string;
+  shortLabel: string;
+  description: string;
+  votes: number;
+  needed: number;
+  myVote: boolean;
+  createdAt?: number;
+}
+
+export interface AlertResolveProposal {
+  alertId: string;
+  votes: number;
+  needed: number;
+  myVote: boolean;
+  createdAt?: number;
+}
+
+export interface AlertProposalsResponse {
+  create: AlertCreateProposal[];
+  resolve: AlertResolveProposal[];
+  error?: string;
+}
+
+export async function fetchActiveAlerts(): Promise<AlertsActiveResponse> {
+  const res = await fetchWithRetry(`${BASE_URL}/alerts/active`, {
+    headers,
+    timeoutMs: 10000,
+  });
+  if (res.status === 404) return { alerts: [] };
+  const data = (await parseAlertsResponse(res)) as AlertsActiveResponse & { error?: string };
+  if (!res.ok) throw new Error((data?.error as string) || `Failed to fetch alerts: ${res.status}`);
+  return { alerts: Array.isArray(data.alerts) ? data.alerts : [] };
+}
+
+export async function fetchAlertProposals(): Promise<AlertProposalsResponse> {
+  const res = await fetchWithRetry(`${BASE_URL}/alerts/proposals`, {
+    headers,
+    timeoutMs: 10000,
+  });
+  if (res.status === 404) return { create: [], resolve: [] };
+  const data = (await parseAlertsResponse(res)) as AlertProposalsResponse & { error?: string };
+  if (!res.ok) throw new Error((data?.error as string) || `Failed to fetch alert proposals: ${res.status}`);
+  return {
+    create: Array.isArray(data.create) ? data.create : [],
+    resolve: Array.isArray(data.resolve) ? data.resolve : [],
+  };
+}
+
+export async function submitCreateAlertProposal(
+  shortLabel: string,
+  description: string
+): Promise<{ success: boolean; proposals: AlertProposalsResponse; promoted?: boolean }> {
+  const res = await fetchWithRetry(`${BASE_URL}/alerts/proposals/create`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ shortLabel, description }),
+    timeoutMs: 10000,
+  });
+  const data = (await parseAlertsResponse(res)) as { success?: boolean; proposals?: { create?: unknown[]; resolve?: unknown[] }; promoted?: boolean; error?: string };
+  if (!res.ok) throw new Error((data?.error as string) || `Failed to propose alert: ${res.status}`);
+  return {
+    success: data.success,
+    proposals: {
+      create: Array.isArray(data.proposals?.create) ? data.proposals.create : [],
+      resolve: Array.isArray(data.proposals?.resolve) ? data.proposals.resolve : [],
+    },
+    promoted: data.promoted,
+  };
+}
+
+export async function voteCreateProposal(
+  proposalId: string
+): Promise<{ success: boolean; proposals: AlertProposalsResponse; alerts?: CommunityAlert[]; promoted?: boolean }> {
+  const res = await fetchWithRetry(`${BASE_URL}/alerts/proposals/create/${encodeURIComponent(proposalId)}/vote`, {
+    method: "POST",
+    headers,
+    timeoutMs: 10000,
+  });
+  const data = (await parseAlertsResponse(res)) as { success?: boolean; proposals?: { create?: unknown[]; resolve?: unknown[] }; alerts?: CommunityAlert[]; promoted?: boolean; error?: string };
+  if (!res.ok) throw new Error((data?.error as string) || `Failed to vote: ${res.status}`);
+  return {
+    success: data.success,
+    proposals: {
+      create: Array.isArray(data.proposals?.create) ? data.proposals.create : [],
+      resolve: Array.isArray(data.proposals?.resolve) ? data.proposals.resolve : [],
+    },
+    alerts: Array.isArray(data.alerts) ? data.alerts : undefined,
+    promoted: data.promoted,
+  };
+}
+
+export async function voteResolveProposal(
+  alertId: string
+): Promise<{ success: boolean; alerts: CommunityAlert[]; proposals: { resolve: AlertResolveProposal[] } }> {
+  const res = await fetchWithRetry(`${BASE_URL}/alerts/proposals/resolve`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ alertId }),
+    timeoutMs: 10000,
+  });
+  const data = (await parseAlertsResponse(res)) as { success?: boolean; alerts?: CommunityAlert[]; proposals?: { resolve?: AlertResolveProposal[] }; error?: string };
+  if (!res.ok) throw new Error((data?.error as string) || `Failed to vote resolve: ${res.status}`);
+  return {
+    success: data.success,
+    alerts: Array.isArray(data.alerts) ? data.alerts : [],
+    proposals: { resolve: Array.isArray(data.proposals?.resolve) ? data.proposals.resolve : [] },
+  };
+}
