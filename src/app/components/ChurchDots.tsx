@@ -25,7 +25,7 @@ interface ChurchDotsProps {
   selectedChurchId: string | null;
   zoom: number;
   center: [number, number];
-  onChurchClick: (church: Church) => void;
+  onChurchClick: (church: Church, e?: React.MouseEvent<SVGGElement>) => void;
   onChurchHover: (church: Church | null) => void;
 }
 
@@ -112,7 +112,7 @@ export const ChurchDots = memo(function ChurchDots({
         const ch = churchById.get(id);
         if (ch) {
           e.stopPropagation(); // Prevent click from reaching background rect (navigate-back)
-          onChurchClick(ch);
+          onChurchClick(ch, e);
         }
       }
     },
@@ -167,18 +167,29 @@ export const ChurchDots = memo(function ChurchDots({
       >
         {visibleBySize.map((v) =>
           v.id === selectedChurchId ? null : (
-            <circle
-              key={v.id}
-              data-id={v.id}
-              cx={v.x}
-              cy={v.y}
-              r={(v.r * dotScale) / zoomDiv}
-              fill={v.color}
-              fillOpacity={0.8}
-              stroke="rgba(255,255,255,0.6)"
-              strokeWidth={(0.8 * dotScale) / zoomDiv}
-              style={{ cursor: "pointer" }}
-            />
+            <g key={v.id}>
+              {/* Larger invisible hit area (1.5×) for easier tap/click, especially on touch */}
+              <circle
+                data-id={v.id}
+                cx={v.x}
+                cy={v.y}
+                r={(1.5 * v.r * dotScale) / zoomDiv}
+                fill="transparent"
+                stroke="none"
+                style={{ cursor: "pointer" }}
+              />
+              <circle
+                data-id={v.id}
+                cx={v.x}
+                cy={v.y}
+                r={(v.r * dotScale) / zoomDiv}
+                fill={v.color}
+                fillOpacity={0.8}
+                stroke="rgba(255,255,255,0.6)"
+                strokeWidth={(0.8 * dotScale) / zoomDiv}
+                style={{ cursor: "pointer", pointerEvents: "none" }}
+              />
+            </g>
           )
         )}
       </g>

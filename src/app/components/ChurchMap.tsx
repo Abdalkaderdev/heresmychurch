@@ -513,14 +513,30 @@ function MapArea({
       />
 
       {/* Tooltips */}
-      {d.hoveredState && !d.focusedState && !d.hoveredChurch && (
+      {d.hoveredState && !d.focusedState && !(d.previewChurch ?? d.hoveredChurch) && (
         <StateTooltip hoveredState={d.hoveredState} states={d.states} tooltipPos={d.tooltipPos} />
       )}
-      {d.hoveredChurch && d.hoveredChurch.id !== d.selectedChurch?.id && (
-        <ChurchTooltip church={d.hoveredChurch} tooltipPos={d.tooltipPos} />
+      {(d.previewChurch ?? d.hoveredChurch) && (d.previewChurch ?? d.hoveredChurch)!.id !== d.selectedChurch?.id && (
+        <ChurchTooltip
+          church={(d.previewChurch ?? d.hoveredChurch)!}
+          tooltipPos={d.tooltipPos}
+          pinned={d.previewPinned}
+          onViewChurch={d.previewPinned ? d.onViewChurch : undefined}
+          onClose={d.previewPinned ? d.clearPreview : undefined}
+        />
       )}
-      {d.focusedState && d.hoveredCounty && d.countyStats && !d.hoveredChurch && (
+      {d.focusedState && d.hoveredCounty && d.countyStats && !(d.previewChurch ?? d.hoveredChurch) && (
         <CountyTooltip countyFips={d.hoveredCounty} countyStats={d.countyStats} tooltipPos={d.tooltipPos} />
+      )}
+
+      {/* Click-outside backdrop: dismiss pinned church preview */}
+      {d.previewPinned && (
+        <div
+          className="absolute inset-0 z-[45]"
+          aria-hidden
+          onClick={d.clearPreview}
+          onTouchEnd={(e) => { e.preventDefault(); d.clearPreview(); }}
+        />
       )}
 
       {/* Click-catcher: dismiss all overlays */}

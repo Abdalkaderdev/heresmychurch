@@ -510,19 +510,25 @@ app.post(`${P}/admin/enrich-regrid/:state`,async(c)=>{
     function attendanceStats(arr:any[]){const a=arr.map((x:any)=>x.attendance||0).filter((n:number)=>n>0);const total=a.reduce((s:number,n:number)=>s+n,0);const sorted=[...a].sort((x,y)=>x-y);const mid=Math.floor(sorted.length/2);const median=sorted.length?sorted.length%2?sorted[mid]:Math.round((sorted[mid-1]+sorted[mid])/2):0;return{total,median,count:arr.length};}
     const before=attendanceStats(ch);
 
-    const points=ch.map((c:any)=>({id:c.id,lat:c.lat,lng:c.lng}));
-    const {job_uuid}=await regrid.submitBatch(points);
-    const maxWaitMs=20*60*1000,pollIntervalMs=4000;
-    const deadline=Date.now()+maxWaitMs;
-    while(Date.now()<deadline){
-      const status=await regrid.getBatchStatus(job_uuid);
-      if(status.status==="ready")break;
-      if(status.status==="failed")return c.json({error:"Regrid job failed",job_uuid,status},502);
-      await new Promise(r=>setTimeout(r,pollIntervalMs));
+    const points=ch.map((c:any)=>({id:c.id,lat:c.lat,lng:c.lng,address:c.address||"",city:c.city||"",state:c.state||st}));
+    let sqftByChurchId:Map<string,number>;
+    try{
+      const {job_uuid}=await regrid.submitBatch(points);
+      const maxWaitMs=20*60*1000,pollIntervalMs=4000;
+      const deadline=Date.now()+maxWaitMs;
+      while(Date.now()<deadline){
+        const status=await regrid.getBatchStatus(job_uuid);
+        if(status.status==="ready")break;
+        if(status.status==="failed")return c.json({error:"Regrid job failed",job_uuid,status},502);
+        await new Promise(r=>setTimeout(r,pollIntervalMs));
+      }
+      if(Date.now()>=deadline)return c.json({error:"Regrid job timed out",job_uuid},504);
+      sqftByChurchId=await regrid.downloadBatchResults(job_uuid);
+    }catch(batchErr:any){
+      if(batchErr?.message?.includes("401")||batchErr?.message?.includes("No Batch")){
+        sqftByChurchId=await regrid.enrichPointsRealtime(points);
+      }else throw batchErr;
     }
-    if(Date.now()>=deadline)return c.json({error:"Regrid job timed out",job_uuid},504);
-
-    const sqftByChurchId=await regrid.downloadBatchResults(job_uuid);
     let enriched=0;
     for(const c of ch){
       const sqft=sqftByChurchId.get(c.id);

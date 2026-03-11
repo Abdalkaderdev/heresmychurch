@@ -1,4 +1,4 @@
-import { Plus, X, Clock } from "lucide-react";
+import { Plus, Clock } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 
 // ── Types ──
@@ -57,11 +57,14 @@ function serialize(entries: ServiceEntry[]): string {
   });
 
   return sorted
-    .map((e) => {
-      const time = `${e.day} ${e.hour}:${e.minute} ${e.period}`;
-      return e.label.trim() ? `${time} (${e.label.trim()})` : time;
-    })
+    .map((e) => formatEntryStored(e))
     .join("; ");
+}
+
+/** Format a single entry as stored (e.g. "Sun 9:00 AM" or "Sun 9:00 AM (Main Service)") */
+function formatEntryStored(e: ServiceEntry): string {
+  const time = `${e.day} ${e.hour}:${e.minute} ${e.period}`;
+  return e.label.trim() ? `${time} (${e.label.trim()})` : time;
 }
 
 function toMinutes(e: ServiceEntry): number {
@@ -155,123 +158,137 @@ export function ServiceTimesInput({ value, onChange, compact }: ServiceTimesInpu
     ? "bg-white/8 rounded px-1.5 py-1 text-white text-[10px] border border-white/10 focus:border-purple-500/50 focus:outline-none transition-colors appearance-none cursor-pointer"
     : "bg-white/8 rounded-lg px-2 py-1.5 text-white text-[11px] border border-white/10 focus:border-purple-500/50 focus:outline-none transition-colors appearance-none cursor-pointer";
 
+  const inputClass = compact
+    ? "bg-white/5 rounded px-2 py-1 text-[10px] text-white/90 border border-white/5 focus:border-purple-500/30 focus:outline-none transition-colors placeholder:text-white/40"
+    : "bg-white/5 rounded-lg px-2 py-1.5 text-[11px] text-white/90 border border-white/5 focus:border-purple-500/30 focus:outline-none transition-colors placeholder:text-white/40";
+
+  const amPmClass = compact
+    ? "px-2 py-1 text-[10px] font-semibold transition-colors"
+    : "px-2.5 py-1.5 text-[11px] font-semibold transition-colors";
+
   return (
     <div className="space-y-2">
       {/* Entries */}
       {entries.map((entry, idx) => (
-        <div key={entry.id} className="flex items-center gap-1.5 flex-wrap">
-          {/* Day */}
-          <select
-            value={entry.day}
-            onChange={(e) => updateEntry(entry.id, "day", e.target.value)}
-            className={selectClass}
-            style={{ minWidth: compact ? 52 : 60 }}
-          >
-            {DAYS.map((d) => (
-              <option key={d.short} value={d.short} className="bg-[#1E1040]">
-                {d.short}
-              </option>
-            ))}
-          </select>
-
-          {/* Hour */}
-          <select
-            value={entry.hour}
-            onChange={(e) => updateEntry(entry.id, "hour", e.target.value)}
-            className={selectClass}
-            style={{ minWidth: compact ? 38 : 44 }}
-          >
-            {HOURS.map((h) => (
-              <option key={h} value={h} className="bg-[#1E1040]">
-                {h}
-              </option>
-            ))}
-          </select>
-
-          <span className="text-white/30 text-xs font-bold">:</span>
-
-          {/* Minute */}
-          <select
-            value={entry.minute}
-            onChange={(e) => updateEntry(entry.id, "minute", e.target.value)}
-            className={selectClass}
-            style={{ minWidth: compact ? 38 : 44 }}
-          >
-            {MINUTES.map((m) => (
-              <option key={m} value={m} className="bg-[#1E1040]">
-                {m}
-              </option>
-            ))}
-          </select>
-
-          {/* AM/PM */}
-          <div className="flex rounded-md overflow-hidden border border-white/10">
-            <button
-              type="button"
-              onClick={() => updateEntry(entry.id, "period", "AM")}
-              className={`px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
-                entry.period === "AM"
-                  ? "bg-purple-500/40 text-white"
-                  : "bg-white/5 text-white/30 hover:text-white/50"
-              }`}
+        <div
+          key={entry.id}
+          className="rounded-lg border border-white/10 bg-white/[0.04] p-2.5 space-y-2"
+        >
+          {/* Row 1: Day, time, AM/PM */}
+          <div className="flex items-center gap-2 flex-nowrap">
+            <select
+              value={entry.day}
+              onChange={(e) => updateEntry(entry.id, "day", e.target.value)}
+              className={selectClass}
+              style={{ minWidth: compact ? 52 : 60 }}
             >
-              AM
-            </button>
-            <button
-              type="button"
-              onClick={() => updateEntry(entry.id, "period", "PM")}
-              className={`px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
-                entry.period === "PM"
-                  ? "bg-purple-500/40 text-white"
-                  : "bg-white/5 text-white/30 hover:text-white/50"
-              }`}
+              {DAYS.map((d) => (
+                <option key={d.short} value={d.short} className="bg-[#1E1040]">
+                  {d.short}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={entry.hour}
+              onChange={(e) => updateEntry(entry.id, "hour", e.target.value)}
+              className={selectClass}
+              style={{ minWidth: compact ? 38 : 44 }}
             >
-              PM
-            </button>
+              {HOURS.map((h) => (
+                <option key={h} value={h} className="bg-[#1E1040]">
+                  {h}
+                </option>
+              ))}
+            </select>
+
+            <span className="text-white/30 text-xs font-bold">:</span>
+
+            <select
+              value={entry.minute}
+              onChange={(e) => updateEntry(entry.id, "minute", e.target.value)}
+              className={selectClass}
+              style={{ minWidth: compact ? 38 : 44 }}
+            >
+              {MINUTES.map((m) => (
+                <option key={m} value={m} className="bg-[#1E1040]">
+                  {m}
+                </option>
+              ))}
+            </select>
+
+            <div className={`flex overflow-hidden border border-white/10 ${compact ? "rounded" : "rounded-lg"}`}>
+              <button
+                type="button"
+                onClick={() => updateEntry(entry.id, "period", "AM")}
+                className={`${amPmClass} ${
+                  entry.period === "AM"
+                    ? "bg-purple-500/40 text-white"
+                    : "bg-white/5 text-white/30 hover:text-white/50"
+                }`}
+              >
+                AM
+              </button>
+              <button
+                type="button"
+                onClick={() => updateEntry(entry.id, "period", "PM")}
+                className={`${amPmClass} ${
+                  entry.period === "PM"
+                    ? "bg-purple-500/40 text-white"
+                    : "bg-white/5 text-white/30 hover:text-white/50"
+                }`}
+              >
+                PM
+              </button>
+            </div>
           </div>
 
-          {/* Optional label */}
+          {/* Row 2: Label */}
           <input
             type="text"
             value={entry.label}
             onChange={(e) => updateEntry(entry.id, "label", e.target.value)}
-            placeholder="label"
+            placeholder="Optional label (e.g. Spanish, Youth) to differentiate"
             maxLength={20}
-            className={`flex-1 min-w-[60px] bg-white/5 rounded px-2 py-1 text-[10px] text-white/60 border border-white/5 focus:border-purple-500/30 focus:outline-none transition-colors placeholder:text-white/15 ${
-              compact ? "max-w-[70px]" : "max-w-[100px]"
-            }`}
+            className={`${inputClass} w-full`}
           />
 
-          {/* Remove */}
-          <button
-            type="button"
-            onClick={() => removeEntry(entry.id)}
-            className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center hover:bg-red-500/20 transition-colors group"
-          >
-            <X size={10} className="text-white/20 group-hover:text-red-400 transition-colors" />
-          </button>
+          {/* Stored as — same size as inputs */}
+          <div className={`leading-relaxed text-white/60 ${compact ? "text-[10px]" : "text-[11px]"}`}>
+            Stored as: <span className="text-white/90 font-mono">{formatEntryStored(entry)}</span>
+          </div>
         </div>
       ))}
 
-      {/* Add / Presets row */}
+      {/* Add / Presets / Remove row */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
           type="button"
           onClick={addEntry}
-          className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-purple-300 hover:text-purple-200 bg-purple-500/10 hover:bg-purple-500/20 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-purple-300 hover:text-purple-200 bg-purple-500/10 hover:bg-purple-500/20 transition-colors"
         >
-          <Plus size={10} />
+          <Plus size={11} />
           Add service
         </button>
+
+        {entries.length > 0 && (
+          <button
+            type="button"
+            onClick={() => removeEntry(entries[entries.length - 1].id)}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-white/65 hover:bg-white/5 transition-colors"
+          >
+            Remove
+          </button>
+        )}
 
         {entries.length === 0 && (
           <div className="relative">
             <button
               type="button"
               onClick={() => setShowPresets(!showPresets)}
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-white/30 hover:text-white/50 bg-white/5 hover:bg-white/8 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-white/30 hover:text-white/50 bg-white/5 hover:bg-white/8 transition-colors"
             >
-              <Clock size={9} />
+              <Clock size={11} />
               Quick presets
             </button>
             {showPresets && (
@@ -299,13 +316,6 @@ export function ServiceTimesInput({ value, onChange, compact }: ServiceTimesInpu
           </div>
         )}
       </div>
-
-      {/* Preview of canonical output */}
-      {entries.length > 0 && (
-        <div className="text-[9px] text-white/20 leading-relaxed px-0.5">
-          Stored as: <span className="text-white/30 font-mono">{serialize(entries)}</span>
-        </div>
-      )}
     </div>
   );
 }

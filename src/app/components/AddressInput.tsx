@@ -31,7 +31,7 @@ export interface AddressParts {
 }
 
 const INPUT_CLASS =
-  "w-full bg-white/8 rounded-lg px-3 py-2 text-white text-xs border border-white/10 focus:border-purple-500/50 focus:outline-none transition-colors placeholder:text-white/20";
+  "w-full bg-white/8 rounded-lg px-3 py-2 text-white text-xs border border-white/10 focus:border-purple-500/50 focus:outline-none transition-colors placeholder:text-white/45";
 
 /** Serialize address parts to a single string (JSON) for form/API. Includes lat/lng when provided. */
 export function serializeAddress(parts: AddressParts): string {

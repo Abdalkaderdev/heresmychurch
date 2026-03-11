@@ -204,27 +204,44 @@ export function CountyTooltip({
   );
 }
 
-// --- Church Tooltip (hover over dot) ---
+// --- Church Tooltip / Preview (hover or click on dot) ---
 export function ChurchTooltip({
   church,
   tooltipPos,
+  pinned = false,
+  onViewChurch,
+  onClose,
 }: {
   church: Church;
   tooltipPos: { x: number; y: number };
+  pinned?: boolean;
+  onViewChurch?: (church: Church) => void;
+  onClose?: () => void;
 }) {
   const hasAddressOrCity = church.address?.trim() || church.city?.trim();
   const displayLocation = hasAddressOrCity
     ? formatFullAddress(church.address, church.city, church.state)
     : getFallbackLocation(church);
+  const interactive = pinned && (onViewChurch || onClose);
   return (
     <div
-      className="fixed z-50 pointer-events-none rounded-xl shadow-xl px-4 py-3 max-w-[300px]"
+      className={`fixed z-[60] rounded-xl shadow-xl px-4 py-3 max-w-[300px] ${interactive ? "" : "pointer-events-none"}`}
       style={{
         left: tooltipPos.x + 16,
         top: tooltipPos.y - 70,
         backgroundColor: "rgba(30, 16, 64, 0.96)",
       }}
     >
+      {pinned && onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-2 top-2 p-1 rounded text-white/60 hover:text-white hover:bg-white/10"
+          aria-label="Close"
+        >
+          <X size={16} />
+        </button>
+      )}
       <div className="text-sm font-semibold text-white">
         {church.name}
       </div>
@@ -253,6 +270,15 @@ export function ChurchTooltip({
         />
         {church.denomination === "Other" || church.denomination === "Unknown" ? "Unspecified" : church.denomination}
       </div>
+      {pinned && onViewChurch && (
+        <button
+          type="button"
+          onClick={() => onViewChurch(church)}
+          className="mt-3 w-full py-2 rounded-lg text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white"
+        >
+          View church
+        </button>
+      )}
     </div>
   );
 }

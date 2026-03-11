@@ -6,6 +6,10 @@ import {
 
 interface UIState {
   hoveredChurch: any;
+  /** Church shown in preview card when opened by click/tap; stays until View church or dismiss */
+  previewChurch: any;
+  /** When true, preview card stays open on mouse out and is interactive (View church button) */
+  previewPinned: boolean;
   hoveredState: string | null;
   hoveredCounty: string | null;
   tooltipPos: { x: number; y: number };
@@ -25,6 +29,8 @@ interface UIState {
 
 type UIAction =
   | { type: "SET_HOVERED_CHURCH"; value: any }
+  | { type: "SET_PREVIEW_CHURCH"; value: any }
+  | { type: "SET_PREVIEW_PINNED"; value: boolean }
   | { type: "SET_HOVERED_STATE"; value: string | null }
   | { type: "SET_HOVERED_COUNTY"; value: string | null }
   | { type: "SET_TOOLTIP_POS"; value: { x: number; y: number } }
@@ -45,6 +51,10 @@ function uiReducer(state: UIState, action: UIAction): UIState {
   switch (action.type) {
     case "SET_HOVERED_CHURCH":
       return state.hoveredChurch === action.value ? state : { ...state, hoveredChurch: action.value };
+    case "SET_PREVIEW_CHURCH":
+      return state.previewChurch === action.value ? state : { ...state, previewChurch: action.value };
+    case "SET_PREVIEW_PINNED":
+      return state.previewPinned === action.value ? state : { ...state, previewPinned: action.value };
     case "SET_HOVERED_STATE":
       return state.hoveredState === action.value ? state : { ...state, hoveredState: action.value };
     case "SET_HOVERED_COUNTY":
@@ -92,6 +102,8 @@ function uiReducer(state: UIState, action: UIAction): UIState {
 
 const initialUIState: UIState = {
   hoveredChurch: null,
+  previewChurch: null,
+  previewPinned: false,
   hoveredState: null,
   hoveredCounty: null,
   tooltipPos: { x: 0, y: 0 },
@@ -125,13 +137,26 @@ export function useUIState(focusedState: string | null) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [s.showSummary]);
 
-  // Close summary when navigating
+  // Close summary and pinned preview when navigating
   useEffect(() => {
     dispatch({ type: "SET_SHOW_SUMMARY", value: false });
+    dispatch({ type: "SET_PREVIEW_CHURCH", value: null });
+    dispatch({ type: "SET_PREVIEW_PINNED", value: false });
   }, [focusedState]);
 
   // Plain setter functions — dispatch is guaranteed stable by React, so no useCallback needed
   const setHoveredChurch = (v: any) => dispatch({ type: "SET_HOVERED_CHURCH", value: v });
+  const setPreviewChurch = (v: any) => dispatch({ type: "SET_PREVIEW_CHURCH", value: v });
+  const setPreviewPinned = (v: boolean) => dispatch({ type: "SET_PREVIEW_PINNED", value: v });
+  const setPinnedPreview = (church: any, pos: { x: number; y: number }) => {
+    dispatch({ type: "SET_TOOLTIP_POS", value: pos });
+    dispatch({ type: "SET_PREVIEW_CHURCH", value: church });
+    dispatch({ type: "SET_PREVIEW_PINNED", value: true });
+  };
+  const clearPreview = () => {
+    dispatch({ type: "SET_PREVIEW_CHURCH", value: null });
+    dispatch({ type: "SET_PREVIEW_PINNED", value: false });
+  };
   const setHoveredState = (v: string | null) => dispatch({ type: "SET_HOVERED_STATE", value: v });
   const setHoveredCounty = (v: string | null) => dispatch({ type: "SET_HOVERED_COUNTY", value: v });
   const setShowFilterPanel = (v: boolean | ((prev: boolean) => boolean)) => dispatch({ type: "SET_SHOW_FILTER_PANEL", value: v });
@@ -147,11 +172,17 @@ export function useUIState(focusedState: string | null) {
   const toggleSize = (label: string) => dispatch({ type: "TOGGLE_SIZE", label });
   const toggleDenom = (label: string) => dispatch({ type: "TOGGLE_DENOM", label });
   const handleMouseMove = (e: React.MouseEvent) => {
-    dispatch({ type: "SET_TOOLTIP_POS", value: { x: e.clientX, y: e.clientY } });
+    // Don't move the tooltip when preview is pinned, so the "View church" button stays clickable
+    if (!s.previewPinned) {
+      dispatch({ type: "SET_TOOLTIP_POS", value: { x: e.clientX, y: e.clientY } });
+    }
   };
 
   return {
     hoveredChurch: s.hoveredChurch, setHoveredChurch,
+    previewChurch: s.previewChurch, setPreviewChurch,
+    previewPinned: s.previewPinned, setPreviewPinned,
+    setPinnedPreview, clearPreview,
     hoveredState: s.hoveredState, setHoveredState,
     hoveredCounty: s.hoveredCounty, setHoveredCounty,
     tooltipPos: s.tooltipPos,

@@ -948,8 +948,14 @@ export function useChurchMapData({
   const handleZoomOut = () => setZoom((z) => Math.max(z / 1.5, minZoom));
   const preloadChurch = (church: Church) => { refs.current.preloadedChurch = church; };
 
-  const handleChurchDotClick = (church: Church) => {
+  const handleChurchDotClick = (church: Church, e?: { clientX: number; clientY: number }) => {
     ui.setHoveredChurch(null);
+    const pos = e ? { x: e.clientX, y: e.clientY } : ui.tooltipPos;
+    ui.setPinnedPreview(church, pos);
+  };
+
+  const onViewChurch = (church: Church) => {
+    ui.clearPreview();
     if (focusedState) {
       navigateToChurch(focusedState, getChurchUrlSegment(church, focusedState));
     }
@@ -977,6 +983,9 @@ export function useChurchMapData({
     // UI state (forwarded from useUIState)
     hoveredChurch: ui.hoveredChurch,
     setHoveredChurch: ui.setHoveredChurch,
+    previewChurch: ui.previewChurch,
+    previewPinned: ui.previewPinned,
+    clearPreview: ui.clearPreview,
     hoveredState: ui.hoveredState,
     setHoveredState: ui.setHoveredState,
     hoveredCounty: ui.hoveredCounty,
@@ -1032,6 +1041,7 @@ export function useChurchMapData({
     handleZoomOut,
     handleMouseMove: ui.handleMouseMove,
     handleChurchDotClick,
+    onViewChurch,
   };
 }
 
