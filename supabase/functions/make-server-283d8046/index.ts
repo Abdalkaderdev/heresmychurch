@@ -239,6 +239,9 @@ function parse(els:any[],st:string):any[]{
     const denomination=normD(t);
     if(isBlockedDenomination(denomination))return null;
     const sqft=getElArea(el);
+    // Free geometry data after area calc to reduce memory for large states
+    if(el.geometry)el.geometry=undefined;
+    if(el.members)for(const m of el.members)if(m.geometry)m.geometry=undefined;
     const attendance=sqft>0?Math.max(10,Math.min(25000,Math.round(sqft/55))):estA(t,el.id,el.type);
     const obj:any={id:`${st}-${el.id||i}`,name:t.name||t["name:en"]||"Unnamed Church",lat,lng,denomination,attendance,state:st.toUpperCase(),city:city(t),address:t["addr:street"]?`${t["addr:housenumber"]||""} ${t["addr:street"]}`.trim():"",website:t.website||t["contact:website"]||""};
     if(sqft>0)obj.buildingSqft=Math.round(sqft);
@@ -538,9 +541,21 @@ app.post(`${P}/churches/populate/:state`,async(c)=>{
     if(!force&&Array.isArray(ex)&&ex.length)return c.json({message:`${info.n} already has ${ex.length} churches.`,count:ex.length,alreadyCached:true});
     console.log(`Populating ${info.n}${force?" (force)":""}...`);
     const ch=await fetchCh(st);const en=enrichARDA(ch);applyStateScaling(ch,st);
+    // Preserve community-submitted churches from pending store
+    const pending=await kv.get(`pending-churches:${st}`);
+    let communityCount=0;
+    if(pending&&Array.isArray(pending.churches)){
+      const osmIds=new Set(ch.map((x:any)=>x.id));
+      for(const pc of pending.churches){
+        if(pc.approved&&pc.id?.startsWith("community-")&&!osmIds.has(pc.id)){
+          const churchForMain={id:pc.id,shortId:pc.shortId,name:pc.name,address:pc.address||"",city:pc.city||"",state:st,lat:pc.lat,lng:pc.lng,denomination:pc.denomination||"Unknown",attendance:pc.attendance||50,website:pc.website||"",serviceTimes:pc.serviceTimes,languages:pc.languages,ministries:pc.ministries,pastorName:pc.pastorName,phone:pc.phone,email:pc.email,lastVerified:pc.submittedAt||Date.now()};
+          ch.push(churchForMain);communityCount++;
+        }
+      }
+    }
     await kv.set(`churches:${st}`,ch);await writeIdx(st,ch);
     const meta=(await kv.get("churches:meta"))||{stateCounts:{}};meta.stateCounts[st]=ch.length;meta.lastUpdated=new Date().toISOString();await kv.set("churches:meta",meta);
-    return c.json({message:`Populated ${ch.length} churches for ${info.n}`,count:ch.length,state:{abbrev:info.a,name:info.n,lat:info.la,lng:info.lo},ardaEnriched:en});
+    return c.json({message:`Populated ${ch.length} churches for ${info.n}`,count:ch.length,communityPreserved:communityCount,state:{abbrev:info.a,name:info.n,lat:info.la,lng:info.lo},ardaEnriched:en});
   }catch(e){console.log(`Populate error:${e}`);return c.json({error:`${e}`},500);}
 });
 
