@@ -467,7 +467,7 @@ export function ChurchDetailPanel({
                   </button>
                 )}
                 {fullAddress && (
-                  <p className="text-white/50 text-sm leading-relaxed text-pretty">
+                  <p className="text-white/50 text-sm leading-relaxed text-balance">
                     {fullAddress}
                   </p>
                 )}
