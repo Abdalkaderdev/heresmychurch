@@ -755,9 +755,9 @@ function HeaderPill({
           onClick={(e) => { e.stopPropagation(); onShowNationalReviewModal(); }}
           className="flex items-center justify-center gap-1.5 w-full min-w-0 px-5 pb-1.5 -mt-1.5 hover:opacity-80 transition-opacity"
         >
-          <span className="text-pink-300 text-[11px] font-medium min-w-0 truncate">
+          <span className="text-pink-300 text-[11px] font-medium min-w-0 truncate inline-flex items-center gap-1">
             {nationalReviewStatsLoading
-              ? "…% of them need reviewed"
+              ? <><ThreeDotLoader /> <span>of them need reviewed</span></>
               : nationalReviewStats !== null
                 ? `${nationalReviewPercentage}% of them need reviewed`
                 : "—% of them need reviewed"}
@@ -765,6 +765,33 @@ function HeaderPill({
         </div>
       )}
     </div>
+  );
+}
+
+// --- Three-dot triangle loading animation ---
+function ThreeDotLoader() {
+  return (
+    <span
+      className="inline-flex items-center"
+      style={{ width: 10, height: 10, position: "relative", animation: "triangleSpin 1.5s linear infinite" }}
+    >
+      {/* Top dot */}
+      <span
+        className="absolute w-[3px] h-[3px] rounded-full bg-pink-300"
+        style={{ top: 0, left: "50%", transform: "translateX(-50%)", animation: "dotPulse 1.2s ease-in-out infinite", animationDelay: "0s" }}
+      />
+      {/* Bottom-left dot */}
+      <span
+        className="absolute w-[3px] h-[3px] rounded-full bg-pink-300"
+        style={{ bottom: 0, left: 0, animation: "dotPulse 1.2s ease-in-out infinite", animationDelay: "0.2s" }}
+      />
+      {/* Bottom-right dot */}
+      <span
+        className="absolute w-[3px] h-[3px] rounded-full bg-pink-300"
+        style={{ bottom: 0, right: 0, animation: "dotPulse 1.2s ease-in-out infinite", animationDelay: "0.4s" }}
+      />
+      <style>{`@keyframes dotPulse { 0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } } @keyframes triangleSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </span>
   );
 }
 
