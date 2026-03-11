@@ -322,6 +322,9 @@ function NationalSummaryContent({
         )}
       </p>
 
+      {/* Community impact (nation-wide totals) */}
+      <CommunityStatsCard />
+
       {/* Top 3 states by church count — podium style */}
       {stats.topStates.length > 0 && (
         <div>
