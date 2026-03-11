@@ -3,7 +3,6 @@ import {
   Church as ChurchIcon,
   ArrowLeft,
   ChevronDown,
-  Info,
   Check,
   ShieldCheck,
 } from "lucide-react";
@@ -38,6 +37,7 @@ import type { ChurchClickTarget } from "./ChurchDetailPanel";
 import { fetchNationalReviewStats } from "./api";
 import type { NationalReviewStatsResponse } from "./api";
 import { useIsMobile } from "./ui/use-mobile";
+import { PendingAlertsPill } from "./PendingAlertsPill";
 import { useReducer, useEffect, useMemo, useState } from "react";
 import logoImg from "../../assets/a94bce1cf0860483364d5d9c353899b7da8233e7.png";
 
@@ -91,14 +91,6 @@ export function ChurchMap({
       : (d.focusedState || d.selectedChurch ? false : (d.searchCollapsed && isMobile));
   // Only count search as "overlay open" on national + mobile (so map tap can collapse the pill). Desktop national and state/church always show full search — no overlay for search.
   const isNationalView = !d.focusedState && !d.selectedChurch;
-  const anyOverlayOpen = d.showSummary || d.showFilterPanel || d.showLegend || (isNationalView && isMobile && !effectiveSearchCollapsed);
-  // Plain closures (no useCallback — saves 5 hooks)
-  const dismissAllOverlays = () => {
-    d.setShowSummary(false);
-    d.setShowFilterPanel(false);
-    d.setShowLegend(false);
-    d.setSearchCollapsed(true);
-  };
 
   const handleMoveEnd = (coords: [number, number], z: number) => {
     if (Date.now() < d.moveEndSuppressedUntilRef.current.moveEndSuppressedUntil) return;
@@ -117,7 +109,17 @@ export function ChurchMap({
     forceEditForm: false,
     showAbout: !hasSeenAbout && !routeStateAbbrev,
     showHelp: false,
+    showAlertsPanel: false,
   });
+
+  const anyOverlayOpen = d.showSummary || d.showFilterPanel || d.showLegend || local.showAlertsPanel || (isNationalView && isMobile && !effectiveSearchCollapsed);
+  const dismissAllOverlays = () => {
+    d.setShowSummary(false);
+    d.setShowFilterPanel(false);
+    d.setShowLegend(false);
+    d.setSearchCollapsed(true);
+    localDispatch({ type: "SET", key: "showAlertsPanel", value: false });
+  };
 
   const dismissAbout = () => {
     localDispatch({ type: "SET", key: "showAbout", value: false });
@@ -224,6 +226,8 @@ export function ChurchMap({
         showHelp={local.showHelp}
         onDismissHelp={onDismissHelp}
         onShowHelp={onShowHelp}
+        showAlertsPanel={local.showAlertsPanel}
+        onAlertsPanelChange={(open) => localDispatch({ type: "SET", key: "showAlertsPanel", value: open })}
         activePeople={activePeople}
         activeBots={activeBots}
         isLocalhost={isLocalhost}
@@ -373,6 +377,7 @@ type LocalState = {
   forceEditForm: boolean;
   showAbout: boolean;
   showHelp: boolean;
+  showAlertsPanel: boolean;
 };
 type LocalAction = { type: "SET"; key: keyof LocalState; value: any };
 function localReducer(state: LocalState, action: LocalAction): LocalState {
@@ -402,6 +407,8 @@ function MapArea({
   showHelp,
   onDismissHelp,
   onShowHelp,
+  showAlertsPanel,
+  onAlertsPanelChange,
   activePeople,
   activeBots,
   isLocalhost,
@@ -428,6 +435,8 @@ function MapArea({
   showHelp: boolean;
   onDismissHelp: () => void;
   onShowHelp: () => void;
+  showAlertsPanel: boolean;
+  onAlertsPanelChange: (open: boolean) => void;
   activePeople: number;
   activeBots: number;
   isLocalhost: boolean;
@@ -436,10 +445,10 @@ function MapArea({
 }) {
   return (
     <div className="flex-1 relative" style={{ backgroundColor: "#F5F0E8" }}>
-      {/* Top row: header pill only (secondary controls moved to bottom-left cluster); z-40 so summary stacks above All states + MapControls (z-30) */}
+      {/* Top row: header pill only (secondary controls moved to bottom-left cluster); z-40 so summary stacks above All states + MapControls (z-30). pointer-events-none so click-outside hits the catcher. */}
       {!isLoadingVisible && d.states.length > 0 && (
-      <div className="absolute top-4 left-4 right-4 z-40 flex flex-row items-center justify-center animate-in fade-in duration-300">
-        <div className="flex flex-col items-center justify-center min-w-0 overflow-hidden max-w-full" ref={d.summaryRef}>
+      <div className="absolute top-4 left-4 right-4 z-40 flex flex-row items-center justify-center animate-in fade-in duration-300 pointer-events-none">
+        <div className="flex flex-col items-center justify-center min-w-0 overflow-hidden max-w-full pointer-events-auto" ref={d.summaryRef}>
           <HeaderPill
             focusedState={d.focusedState}
             focusedStateName={d.focusedStateName}
@@ -461,18 +470,14 @@ function MapArea({
             }}
           />
 
-          {/* About blurb — national view only */}
-          {!d.focusedState && !d.showSummary && (
-            <button
-              onClick={onShowAbout}
-              className="mt-1.5 flex items-center gap-1.5 px-3 py-1 rounded-full transition-all hover:opacity-70"
-              style={{ boxShadow: "none" }}
-            >
-              <Info size={11} className="text-[rgba(30,16,64,0.92)]" />
-              <span className="text-[rgba(30,16,64,0.92)] text-[11px] font-normal">
-                An open-source map of every U.S. church
-              </span>
-            </button>
+          {/* Pending errors — below header pill; you control content via config */}
+          {!d.showSummary && (
+            <div className="mt-1.5">
+              <PendingAlertsPill
+                open={showAlertsPanel}
+                onOpenChange={onAlertsPanelChange}
+              />
+            </div>
           )}
 
           <AnimatePresence>
@@ -589,7 +594,8 @@ function MapArea({
       )}
 
       {!isLoadingVisible && (
-        <div className="absolute left-4 bottom-4 z-30 flex flex-col gap-2 items-start">
+        <div className="absolute left-4 bottom-4 z-30 flex flex-col gap-2 items-start pointer-events-none">
+          <div className="pointer-events-auto flex flex-col gap-2 items-start">
           {(d.focusedState || d.selectedChurch) && (
             <button
               onClick={d.handleResetView}
@@ -626,11 +632,13 @@ function MapArea({
                 d.setSearchCollapsed(true);
               }
             }}
+            onShowAbout={onShowAbout}
             onShowHelp={onShowHelp}
             zoom={d.zoom}
             compact
           />
           )}
+          </div>
         </div>
       )}
 
@@ -671,14 +679,14 @@ function MapArea({
 
       {!isLoadingVisible && !d.showFilterPanel && !d.showLegend && (
         <div
-          className={`absolute left-6 right-6 md:left-12 md:right-12 z-40 flex flex-col items-center gap-2.5 ${d.selectedChurch ? (isMobile ? "top-[80px] md:top-auto md:bottom-8" : "md:bottom-8") : "bottom-3 md:bottom-8"}`}
+          className={`absolute left-6 right-6 md:left-12 md:right-12 z-40 flex flex-col items-center gap-2.5 pointer-events-none ${d.selectedChurch ? (isMobile ? "top-[80px] md:top-auto md:bottom-8" : "md:bottom-8") : "bottom-3 md:bottom-8"}`}
         >
           {/* People with you now — bottom of map; on mobile church view: 8px below top pill */}
           {((activePeople + activeBots) > 1 || (isLocalhost && (activePeople + activeBots) >= 1)) && (() => {
             const withYou = (activePeople + activeBots) - 1;
             const label = withYou === 0 ? "0 people with you now" : withYou === 1 ? "1 person with you now" : `${withYou.toLocaleString()} people with you now`;
             return (
-              <div className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full min-w-0 truncate bg-green-500/5 border border-green-500/10 backdrop-blur-md" style={{ boxShadow: "inset 0 1px 0 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 0 rgba(0, 0, 0, 0.1)" }}>
+              <div className="pointer-events-auto flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full min-w-0 truncate bg-green-500/5 border border-green-500/10 backdrop-blur-md" style={{ boxShadow: "inset 0 1px 0 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 0 rgba(0, 0, 0, 0.1)" }}>
                 <span className="relative flex h-1.5 w-1.5 flex-shrink-0" aria-hidden>
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-600 opacity-75" />
                   <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-600" />
@@ -688,6 +696,7 @@ function MapArea({
             );
           })()}
           {!d.selectedChurch && (
+            <div className="pointer-events-auto w-full max-w-full flex flex-col items-center">
             <MapSearchBar
               churches={d.churches}
               states={d.states}
@@ -703,6 +712,7 @@ function MapArea({
               zoom={d.zoom}
               center={d.center}
             />
+            </div>
           )}
         </div>
       )}
