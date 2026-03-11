@@ -375,39 +375,7 @@ function mergeCorrectionsIntoChurches(churches:any[],corrections:Record<string,R
   }
 }
 
-app.get(`${P}/churches/:state`,async(c)=>{
-  try{
-    const st=c.req.param("state").toUpperCase(),info=gS(st);
-    if(!info)return c.json({error:`Unknown state: ${st}`},400);
-    let ch=await kv.get(`churches:${st}`);
-    if(!ch||!Array.isArray(ch)||!ch.length)return c.json({churches:[],state:{abbrev:info.a,name:info.n,lat:info.la,lng:info.lo},fromCache:false,message:`No data for ${info.n}. POST /churches/populate/${st} to fetch.`});
-    if(st==="MD"){try{const dc=await kv.get("churches:DC");if(Array.isArray(dc)&&dc.length){const ids=new Set(ch.map((c:any)=>c.id));for(const x of dc)if(!ids.has(x.id))ch.push({...x,state:"MD"});}}catch(_){}}
-    const corrections=await getApprovedCorrectionsForState(st);
-    mergeCorrectionsIntoChurches(ch,corrections);
-    const withShort=addShortIds(ch,st);
-    let cal=await kv.get(`calibration:${st}`);
-    if(!cal||!cal.medians){cal=await computeCalibrationForState(st,ch);try{await kv.set(`calibration:${st}`,cal);}catch(_){}}
-    if(Object.keys(cal.medians||{}).length)applyCalibrationToChurches(withShort,cal);
-    return c.json({churches:withShort,state:{abbrev:info.a,name:info.n,lat:info.la,lng:info.lo},count:withShort.length,fromCache:true});
-  }catch(e){return c.json({churches:[],error:`${e}`},500);}
-});
-
-app.post(`${P}/churches/populate/:state`,async(c)=>{
-  try{
-    const st=c.req.param("state").toUpperCase(),info=gS(st);
-    if(!info)return c.json({error:`Unknown state: ${st}`},400);
-    const force=c.req.query("force")==="true";
-    const ex=await kv.get(`churches:${st}`);
-    if(!force&&Array.isArray(ex)&&ex.length)return c.json({message:`${info.n} already has ${ex.length} churches.`,count:ex.length,alreadyCached:true});
-    console.log(`Populating ${info.n}${force?" (force)":""}...`);
-    const ch=await fetchCh(st);const en=enrichARDA(ch);applyStateScaling(ch,st);
-    await kv.set(`churches:${st}`,ch);await writeIdx(st,ch);
-    const meta=(await kv.get("churches:meta"))||{stateCounts:{}};meta.stateCounts[st]=ch.length;meta.lastUpdated=new Date().toISOString();await kv.set("churches:meta",meta);
-    return c.json({message:`Populated ${ch.length} churches for ${info.n}`,count:ch.length,state:{abbrev:info.a,name:info.n,lat:info.la,lng:info.lo},ardaEnriched:en});
-  }catch(e){console.log(`Populate error:${e}`);return c.json({error:`${e}`},500);}
-});
-
-// ── Review stats (needs review = missing 2+ of address, service times, denomination) ──
+// ── Review stats (must be before /churches/:state so "review-stats" is not matched as state) ──
 const TIER1_DENOM_EMPTY=["","Unknown","Other"];
 const TIER1_SVC_EMPTY=["","unknown","other","see website","tbd","n/a","na","pending","to be determined"];
 function isDenomMissing(d:string|undefined):boolean{if(!d)return true;const v=d.trim();return !v||TIER1_DENOM_EMPTY.includes(v);}
@@ -457,6 +425,38 @@ app.get(`${P}/churches/review-stats`,async(c)=>{
     const percentage=totalChurches>0?Math.round((totalNeedsReview/totalChurches)*1000)/10:0;
     return c.json({states,totalChurches,totalNeedsReview,percentage,missingAddress,missingServiceTimes,missingDenomination});
   }catch(e){return c.json({states:{},totalChurches:0,totalNeedsReview:0,percentage:0,missingAddress:0,missingServiceTimes:0,missingDenomination:0,error:`${e}`},500);}
+});
+
+app.get(`${P}/churches/:state`,async(c)=>{
+  try{
+    const st=c.req.param("state").toUpperCase(),info=gS(st);
+    if(!info)return c.json({error:`Unknown state: ${st}`},400);
+    let ch=await kv.get(`churches:${st}`);
+    if(!ch||!Array.isArray(ch)||!ch.length)return c.json({churches:[],state:{abbrev:info.a,name:info.n,lat:info.la,lng:info.lo},fromCache:false,message:`No data for ${info.n}. POST /churches/populate/${st} to fetch.`});
+    if(st==="MD"){try{const dc=await kv.get("churches:DC");if(Array.isArray(dc)&&dc.length){const ids=new Set(ch.map((c:any)=>c.id));for(const x of dc)if(!ids.has(x.id))ch.push({...x,state:"MD"});}}catch(_){}}
+    const corrections=await getApprovedCorrectionsForState(st);
+    mergeCorrectionsIntoChurches(ch,corrections);
+    const withShort=addShortIds(ch,st);
+    let cal=await kv.get(`calibration:${st}`);
+    if(!cal||!cal.medians){cal=await computeCalibrationForState(st,ch);try{await kv.set(`calibration:${st}`,cal);}catch(_){}}
+    if(Object.keys(cal.medians||{}).length)applyCalibrationToChurches(withShort,cal);
+    return c.json({churches:withShort,state:{abbrev:info.a,name:info.n,lat:info.la,lng:info.lo},count:withShort.length,fromCache:true});
+  }catch(e){return c.json({churches:[],error:`${e}`},500);}
+});
+
+app.post(`${P}/churches/populate/:state`,async(c)=>{
+  try{
+    const st=c.req.param("state").toUpperCase(),info=gS(st);
+    if(!info)return c.json({error:`Unknown state: ${st}`},400);
+    const force=c.req.query("force")==="true";
+    const ex=await kv.get(`churches:${st}`);
+    if(!force&&Array.isArray(ex)&&ex.length)return c.json({message:`${info.n} already has ${ex.length} churches.`,count:ex.length,alreadyCached:true});
+    console.log(`Populating ${info.n}${force?" (force)":""}...`);
+    const ch=await fetchCh(st);const en=enrichARDA(ch);applyStateScaling(ch,st);
+    await kv.set(`churches:${st}`,ch);await writeIdx(st,ch);
+    const meta=(await kv.get("churches:meta"))||{stateCounts:{}};meta.stateCounts[st]=ch.length;meta.lastUpdated=new Date().toISOString();await kv.set("churches:meta",meta);
+    return c.json({message:`Populated ${ch.length} churches for ${info.n}`,count:ch.length,state:{abbrev:info.a,name:info.n,lat:info.la,lng:info.lo},ardaEnriched:en});
+  }catch(e){console.log(`Populate error:${e}`);return c.json({error:`${e}`},500);}
 });
 
 app.get(`${P}/churches/denominations/all`,async(c)=>{
