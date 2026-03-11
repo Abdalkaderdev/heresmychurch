@@ -209,7 +209,7 @@ function StateSummaryContent({
       </p>
 
       {/* Community impact */}
-      <CommunityStatsCard />
+      <CommunityStatsCard stateAbbrev={focusedState} />
 
       {/* Interesting facts */}
       <FactsList facts={stats.interestingFacts} />
@@ -366,11 +366,11 @@ function NationalSummaryContent({
   );
 }
 
-function CommunityStatsCard() {
+function CommunityStatsCard({ stateAbbrev }: { stateAbbrev?: string }) {
   const [stats, setStats] = useState<CommunityStats | null>(null);
   useEffect(() => {
-    fetchCommunityStats().then(setStats).catch(() => {});
-  }, []);
+    fetchCommunityStats(stateAbbrev).then(setStats).catch(() => {});
+  }, [stateAbbrev]);
   if (!stats || (stats.totalCorrections === 0 && stats.churchesImproved === 0)) return null;
   return (
     <div className="rounded-xl bg-green-500/5 border border-green-500/10 px-4 py-3.5">
