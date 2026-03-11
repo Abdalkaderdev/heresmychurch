@@ -28,7 +28,7 @@ export interface Church {
   homeCampus?: HomeCampusSummary;
   bilingualProbability?: number; // 0-1, estimated or user-confirmed
   lastVerified?: number; // timestamp of last correction or confirmation
-  /** Building square footage (parcel data); used to improve attendance estimate when available. */
+  /** Building square footage from OSM polygon geometry; used as primary attendance estimate when available. */
   buildingSqft?: number;
 }
 

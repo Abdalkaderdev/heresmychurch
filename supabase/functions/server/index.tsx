@@ -137,6 +137,33 @@ function refARDA(d:string,est:number):number{
 }
 function enrichARDA(ch:any[]):number{let n=0;for(const c of ch){const o=c.attendance;c.attendance=refARDA(c.denomination,o);if(c.attendance!==o)n++;}return n;}
 
+// ── Building area from OSM polygon geometry ──
+function calcAreaSqft(geom:{lat:number,lon:number}[]):number{
+  if(!geom||geom.length<3)return 0;
+  const toRad=Math.PI/180;
+  const midLat=geom.reduce((s,p)=>s+p.lat,0)/geom.length;
+  const cosLat=Math.cos(midLat*toRad);
+  const mPerDegLat=111320,mPerDegLon=111320*cosLat;
+  let area=0;
+  for(let i=0;i<geom.length;i++){
+    const j=(i+1)%geom.length;
+    const xi=geom[i].lon*mPerDegLon,yi=geom[i].lat*mPerDegLat;
+    const xj=geom[j].lon*mPerDegLon,yj=geom[j].lat*mPerDegLat;
+    area+=xi*yj-xj*yi;
+  }
+  const sqft=Math.abs(area/2)*10.764;
+  return(sqft>=500&&sqft<=200000)?sqft:0;
+}
+function getElArea(el:any):number{
+  if(el.type==="way"&&Array.isArray(el.geometry))return calcAreaSqft(el.geometry);
+  if(el.type==="relation"&&Array.isArray(el.members)){
+    let total=0;
+    for(const m of el.members){if(m.role==="outer"&&Array.isArray(m.geometry))total+=calcAreaSqft(m.geometry);}
+    return(total>=500&&total<=200000)?total:0;
+  }
+  return 0;
+}
+
 // ── Attendance estimation ──
 function seed(s:string):number{let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}return(Math.abs(h)%10000)/10000;}
 function svcC(t:Record<string,string>):number{const s=t.service_times||t["service_times:sunday"]||"";return s?s.split(/[,;]/).filter((x:string)=>/\d{1,2}:\d{2}/.test(x)).length:0;}
@@ -157,7 +184,6 @@ function estA(tags:Record<string,string>,oid:string|number,eT?:string):number{
   const mega=/\b(saddleback|lakewood|elevation|life\.?church|north ?point|willow creek|gateway church|church of the highlands)\b/;
   if(mega.test(nm))m*=10;
   const sc=svcC(tags);if(sc>=3)m*=2;else if(sc===2)m*=1.5;
-  if(eT==="way"||eT==="relation")m*=1.1;
   const tc=Object.keys(tags).length;if(tc>=15)m*=1.3;else if(tc>=10)m*=1.15;else if(tc<=3)m*=0.9;
   if(tags.website||tags["contact:website"])m*=1.15;
   if(tags.wikidata||tags.wikipedia)m*=2;
@@ -196,20 +222,27 @@ async function ovpQ(q:string,label:string):Promise<any[]>{
 function bQ(iso:string,bbox?:[number,number,number,number]):string{
   const f=bbox?`(area.searchArea)(${bbox.join(",")})`:"(area.searchArea)";
   // Request up to 10000 elements per query; public Overpass may still cap at 2000
-  return`[out:json][timeout:90];area["ISO3166-2"="${iso}"]->.searchArea;(node["amenity"="place_of_worship"]["religion"="christian"]${f};way["amenity"="place_of_worship"]["religion"="christian"]${f};relation["amenity"="place_of_worship"]["religion"="christian"]${f};);out center 10000;`;
+  return`[out:json][timeout:90];area["ISO3166-2"="${iso}"]->.searchArea;(node["amenity"="place_of_worship"]["religion"="christian"]${f};way["amenity"="place_of_worship"]["religion"="christian"]${f};relation["amenity"="place_of_worship"]["religion"="christian"]${f};);out geom 10000;`;
 }
 function splitB(b:[number,number,number,number]):[number,number,number,number][]{const[s,w,n,e]=b,mL=(s+n)/2,mN=(w+e)/2;return[[s,w,mL,mN],[s,mN,mL,e],[mL,w,n,mN],[mL,mN,n,e]];}
 
 function parse(els:any[],st:string):any[]{
   const b=B[st.toUpperCase()];
   return els.map((el:any,i:number)=>{
-    const lat=el.lat||el.center?.lat,lng=el.lon||el.center?.lon;
+    // out geom: nodes have lat/lon; ways/relations have bounds (and geometry array)
+    let lat=el.lat,lng=el.lon;
+    if(!lat&&el.bounds){lat=(el.bounds.minlat+el.bounds.maxlat)/2;lng=(el.bounds.minlon+el.bounds.maxlon)/2;}
+    if(!lat&&el.center){lat=el.center.lat;lng=el.center.lon;}
     if(!lat||!lng)return null;
     if(b){const[s,w,n,e]=b;if(lat<s-0.01||lat>n+0.01||lng<w-0.01||lng>e+0.01)return null;}
     const t=el.tags||{};
     const denomination=normD(t);
     if(isBlockedDenomination(denomination))return null;
-    return{id:`${st}-${el.id||i}`,name:t.name||t["name:en"]||"Unnamed Church",lat,lng,denomination,attendance:estA(t,el.id,el.type),state:st.toUpperCase(),city:city(t),address:t["addr:street"]?`${t["addr:housenumber"]||""} ${t["addr:street"]}`.trim():"",website:t.website||t["contact:website"]||""};
+    const sqft=getElArea(el);
+    const attendance=sqft>0?Math.max(10,Math.min(25000,Math.round(sqft/55))):estA(t,el.id,el.type);
+    const obj:any={id:`${st}-${el.id||i}`,name:t.name||t["name:en"]||"Unnamed Church",lat,lng,denomination,attendance,state:st.toUpperCase(),city:city(t),address:t["addr:street"]?`${t["addr:housenumber"]||""} ${t["addr:street"]}`.trim():"",website:t.website||t["contact:website"]||""};
+    if(sqft>0)obj.buildingSqft=Math.round(sqft);
+    return obj;
   }).filter(Boolean);
 }
 

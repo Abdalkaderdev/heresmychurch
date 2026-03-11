@@ -162,8 +162,9 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 We use OpenStreetMap church data with denomination matching, ARDA (Association of
                 Religion Data Archives) reference data, U.S. Census population data,
                 and community-submitted churches and corrections. Attendance estimates
-                are based on denomination averages, capacity data where available,
-                and regional population scaling.
+                are primarily based on building footprint area from OpenStreetMap, with
+                denomination averages, capacity data, and regional population scaling
+                used where building data is not available.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="data-updates" className="border-white/10">

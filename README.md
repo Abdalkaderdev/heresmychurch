@@ -53,7 +53,7 @@ The goal is simple: make it easy for anyone to find a church near them, with dat
 - [Hono](https://hono.dev) — lightweight HTTP framework for edge functions
 
 **Data Sources**
-- OpenStreetMap church data with denomination matching
+- OpenStreetMap church data with denomination matching and building footprint geometry for attendance estimation
 - ARDA (Association of Religion Data Archives) reference data for denomination-based attendance estimates
 - U.S. Census population data for regional scaling (state/county from Census POPESTIMATE2023)
 - Community-submitted churches and corrections

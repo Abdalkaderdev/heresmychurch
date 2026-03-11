@@ -266,13 +266,12 @@ export function ChurchDetailPanel({
   const denomGroup = getDenominationGroup(church.denomination);
   const bilingualInfo = estimateBilingualProbability(church);
 
-  // Count missing extended fields to encourage contributions (phone is optional, not counted)
+  // Count missing extended fields to encourage contributions (phone and email are optional, not counted)
   const missingFieldCount = [
     !church.serviceTimes,
     !church.languages || church.languages.length === 0,
     !church.ministries || church.ministries.length === 0,
     !church.pastorName,
-    !church.email,
   ].filter(Boolean).length;
 
   // Other campuses (same state): churches that list this one as their main
@@ -468,7 +467,7 @@ export function ChurchDetailPanel({
                   </button>
                 )}
                 {fullAddress && (
-                  <p className="text-white/50 text-sm leading-relaxed">
+                  <p className="text-white/50 text-sm leading-relaxed text-pretty">
                     {fullAddress}
                   </p>
                 )}
@@ -936,8 +935,8 @@ export function ChurchDetailPanel({
         <div className="pt-3 border-t border-white/5">
           <p className="text-white/25 text-xs leading-relaxed text-center">
             Data sourced from OpenStreetMap. Attendance figures are estimates
-            based on denomination averages, capacity data, and regional
-            population scaling.
+            based on building footprint area, denomination averages, capacity
+            data, and regional population scaling.
           </p>
           {church.lastVerified && (
             <p className="text-white/30 text-xs mt-1 text-center flex items-center justify-center gap-1">

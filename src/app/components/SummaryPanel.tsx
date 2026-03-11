@@ -142,7 +142,7 @@ export function SummaryPanel({
               : "Click any state to find or add your church!"}
           </p>
           <p className="text-white/20 text-[10px] text-center leading-relaxed">
-            Church data from OpenStreetMap via Overpass API{" "}&middot;{" "}
+            Church data and building footprints from OpenStreetMap via Overpass API{" "}&middot;{" "}
             Cross-referenced with The Association of Religion Data Archives (ARDA){" "}&middot;{" "}
             Population from U.S. Census Bureau{" "}&middot;{" "}
             Boundaries from Natural Earth / U.S. Census TIGER

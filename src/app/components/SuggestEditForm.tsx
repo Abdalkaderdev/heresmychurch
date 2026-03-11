@@ -60,7 +60,7 @@ const FIELD_CONFIG: {
 ];
 
 // Fields that are optional — don't count toward "missing" and show "Optional" badge when empty
-const OPTIONAL_FIELDS: EditableField[] = ["phone", "homeCampusId"];
+const OPTIONAL_FIELDS: EditableField[] = ["phone", "email", "homeCampusId"];
 
 function isOptionalField(field: EditableField): boolean {
   return OPTIONAL_FIELDS.includes(field);

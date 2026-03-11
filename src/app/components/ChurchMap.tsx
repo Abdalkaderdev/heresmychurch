@@ -758,7 +758,7 @@ function HeaderPill({
         {focusedState ? (
           <span className="text-white text-sm text-pretty min-w-0 truncate flex items-center gap-2">
             <span className="font-medium">
-              {filteredCount.toLocaleString()} churches
+              {filteredCount === 0 ? "Loading churches" : `${filteredCount.toLocaleString()} churches`}
             </span>{" "}
             in{" "}
             <span className="text-white font-medium flex items-center gap-1.5">
@@ -769,7 +769,7 @@ function HeaderPill({
         ) : (
           <span className="text-white text-sm text-pretty min-w-0 truncate">
             <span className="font-medium">
-              {totalChurches.toLocaleString()} churches
+              {totalChurches === 0 ? "Loading churches" : `${totalChurches.toLocaleString()} churches`}
             </span>{" "}
             across{" "}
             <span className="text-purple-300 font-medium">
