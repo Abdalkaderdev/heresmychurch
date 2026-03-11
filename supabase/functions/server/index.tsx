@@ -254,6 +254,21 @@ function addShortIds(ch:any[],st:string):any[]{return ch.map((c:any)=>({...c,sho
 function buildIdx(ch:any[]){return ch.map((c:any)=>({id:c.id,n:c.name||"",c:c.city||"",d:c.denomination||"",a:c.attendance||0,ad:c.address||"",la:c.lat||0,lo:c.lng||0}));}
 async function writeIdx(st:string,ch:any[]){await kv.set(`churches:sidx:${st}`,buildIdx(ch));}
 
+// Relevance scoring: keep in sync with src/app/components/search-scoring.ts
+const PHRASE=1000,ALL_IN_NAME=500,NAME_STARTS=300,TOK_NAME=50,TOK_LOC=30;
+function scoreMatch(q:string,n:string,ci:string,ad:string):number{
+  const tokens=q.split(/\s+/).filter(Boolean);
+  const name=n.toLowerCase(),city=ci.toLowerCase(),address=ad.toLowerCase();
+  let s=0;
+  if(name.includes(q))s+=PHRASE;
+  const inName=tokens.filter((t:string)=>name.includes(t));
+  if(inName.length===tokens.length)s+=ALL_IN_NAME;
+  if(tokens.length>0&&name.startsWith(tokens[0]))s+=NAME_STARTS;
+  s+=inName.length*TOK_NAME;
+  for(const t of tokens)if(city.includes(t)||address.includes(t))s+=TOK_LOC;
+  return s;
+}
+
 // ── App ──
 const app=new Hono();
 app.use("/*",cors({origin:"*",allowHeaders:["Content-Type","Authorization"],allowMethods:["GET","POST","PUT","DELETE","OPTIONS"]}));
@@ -317,10 +332,11 @@ app.get(`${P}/churches/search`,async(c)=>{
 
     const exp=[...target];if(target.includes("MD")&&!target.includes("DC"))exp.push("DC");
 
-    // Fetch indices one-by-one to avoid mget ordering issues
-    const results:any[]=[],seen=new Set<string>();
+    const COLLECT_CAP=500;
+    const candidates:Array<{score:number,id:string,shortId:string,name:string,city:string,state:string,denomination:string,attendance:number,lat:number,lng:number,address:string}>=[];
+    const seen=new Set<string>();
     for(const st of exp){
-      if(results.length>=limit)break;
+      if(candidates.length>=COLLECT_CAP)break;
       const realSt=st==="DC"?"MD":st;
       let items:any[]=null;
       try{
@@ -334,14 +350,17 @@ app.get(`${P}/churches/search`,async(c)=>{
       if(!Array.isArray(items))continue;
       const isIdx=items.length>0&&items[0]?.n!==undefined;
       for(const e of items){
-        if(results.length>=limit)break;
+        if(candidates.length>=COLLECT_CAP)break;
         const n=isIdx?e.n:(e.name||""),ci=isIdx?e.c:(e.city||""),d=isIdx?e.d:(e.denomination||""),ad=isIdx?e.ad:(e.address||"");
         if(search.length){const h=`${n} ${ci} ${d} ${ad}`.toLowerCase();if(!search.every((t:string)=>h.includes(t)))continue;}
         const k=`${n.toLowerCase().replace(/[^a-z0-9]/g,"")}|${ci.toLowerCase().replace(/[^a-z0-9]/g,"")}|${realSt}`;
         if(seen.has(k))continue;seen.add(k);
-        results.push({id:e.id,shortId:toShortId(e.id,realSt,e.shortId),name:n||"Unknown Church",city:ci,state:realSt,denomination:d||"Unknown",attendance:isIdx?e.a:e.attendance,lat:isIdx?e.la:e.lat,lng:isIdx?e.lo:e.lng,address:ad||""});
+        const row={id:e.id,shortId:toShortId(e.id,realSt,e.shortId),name:n||"Unknown Church",city:ci,state:realSt,denomination:d||"Unknown",attendance:isIdx?e.a:e.attendance,lat:isIdx?e.la:e.lat,lng:isIdx?e.lo:e.lng,address:ad||""};
+        candidates.push({score:scoreMatch(q,n,ci,ad),...row});
       }
     }
+    candidates.sort((a,b)=>b.score-a.score||(a.name||"").localeCompare(b.name||""));
+    const results=candidates.slice(0,limit).map(({score,...r})=>r);
     return c.json({results,query:rawQ,statesSearched:target.length,stateFilter:target.length<pop.length?target:undefined});
   }catch(e){return c.json({results:[],query:rawQ,error:`${e}`},500);}
 });

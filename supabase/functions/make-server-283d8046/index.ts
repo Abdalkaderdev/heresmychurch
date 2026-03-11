@@ -254,6 +254,21 @@ function addShortIds(ch:any[],st:string):any[]{return ch.map((c:any)=>({...c,sho
 function buildIdx(ch:any[]){return ch.map((c:any)=>({id:c.id,n:c.name||"",c:c.city||"",d:c.denomination||"",a:c.attendance||0,ad:c.address||"",la:c.lat||0,lo:c.lng||0}));}
 async function writeIdx(st:string,ch:any[]){await kv.set(`churches:sidx:${st}`,buildIdx(ch));}
 
+// Relevance scoring: keep in sync with src/app/components/search-scoring.ts
+const PHRASE=1000,ALL_IN_NAME=500,NAME_STARTS=300,TOK_NAME=50,TOK_LOC=30;
+function scoreMatch(q:string,n:string,ci:string,ad:string):number{
+  const tokens=q.split(/\s+/).filter(Boolean);
+  const name=n.toLowerCase(),city=ci.toLowerCase(),address=ad.toLowerCase();
+  let s=0;
+  if(name.includes(q))s+=PHRASE;
+  const inName=tokens.filter((t:string)=>name.includes(t));
+  if(inName.length===tokens.length)s+=ALL_IN_NAME;
+  if(tokens.length>0&&name.startsWith(tokens[0]))s+=NAME_STARTS;
+  s+=inName.length*TOK_NAME;
+  for(const t of tokens)if(city.includes(t)||address.includes(t))s+=TOK_LOC;
+  return s;
+}
+
 // ── App ──
 const app=new Hono();
 app.use("/*",cors({origin:"*",allowHeaders:["Content-Type","Authorization"],allowMethods:["GET","POST","PUT","DELETE","OPTIONS"]}));
@@ -317,10 +332,11 @@ app.get(`${P}/churches/search`,async(c)=>{
 
     const exp=[...target];if(target.includes("MD")&&!target.includes("DC"))exp.push("DC");
 
-    // Fetch indices one-by-one to avoid mget ordering issues
-    const results:any[]=[],seen=new Set<string>();
+    const COLLECT_CAP=500;
+    const candidates:Array<{score:number,id:string,shortId:string,name:string,city:string,state:string,denomination:string,attendance:number,lat:number,lng:number,address:string}>=[];
+    const seen=new Set<string>();
     for(const st of exp){
-      if(results.length>=limit)break;
+      if(candidates.length>=COLLECT_CAP)break;
       const realSt=st==="DC"?"MD":st;
       let items:any[]=null;
       try{
@@ -334,14 +350,17 @@ app.get(`${P}/churches/search`,async(c)=>{
       if(!Array.isArray(items))continue;
       const isIdx=items.length>0&&items[0]?.n!==undefined;
       for(const e of items){
-        if(results.length>=limit)break;
+        if(candidates.length>=COLLECT_CAP)break;
         const n=isIdx?e.n:(e.name||""),ci=isIdx?e.c:(e.city||""),d=isIdx?e.d:(e.denomination||""),ad=isIdx?e.ad:(e.address||"");
         if(search.length){const h=`${n} ${ci} ${d} ${ad}`.toLowerCase();if(!search.every((t:string)=>h.includes(t)))continue;}
         const k=`${n.toLowerCase().replace(/[^a-z0-9]/g,"")}|${ci.toLowerCase().replace(/[^a-z0-9]/g,"")}|${realSt}`;
         if(seen.has(k))continue;seen.add(k);
-        results.push({id:e.id,shortId:toShortId(e.id,realSt,e.shortId),name:n||"Unknown Church",city:ci,state:realSt,denomination:d||"Unknown",attendance:isIdx?e.a:e.attendance,lat:isIdx?e.la:e.lat,lng:isIdx?e.lo:e.lng,address:ad||""});
+        const row={id:e.id,shortId:toShortId(e.id,realSt,e.shortId),name:n||"Unknown Church",city:ci,state:realSt,denomination:d||"Unknown",attendance:isIdx?e.a:e.attendance,lat:isIdx?e.la:e.lat,lng:isIdx?e.lo:e.lng,address:ad||""};
+        candidates.push({score:scoreMatch(q,n,ci,ad),...row});
       }
     }
+    candidates.sort((a,b)=>b.score-a.score||(a.name||"").localeCompare(b.name||""));
+    const results=candidates.slice(0,limit).map(({score,...r})=>r);
     return c.json({results,query:rawQ,statesSearched:target.length,stateFilter:target.length<pop.length?target:undefined});
   }catch(e){return c.json({results:[],query:rawQ,error:`${e}`},500);}
 });
@@ -373,8 +392,32 @@ function mergeCorrectionsIntoChurches(churches:any[],corrections:Record<string,R
         else{const parts=val.split(",").map((s:string)=>s.trim());(ch as any).address=parts[0]??"";(ch as any).city=parts[1]??(ch as any).city;(ch as any).state=(parts[2]??((ch as any).state||"")).toUpperCase().slice(0,2);}
       }
       else if(f==="phone"){(ch as any).phone=normalizePhone(String(v))||undefined;}
+      else if(f==="homeCampusId"){(ch as any).homeCampusId=(String(v).trim()||undefined);}
       else{(ch as any)[f]=v;}
     }
+  }
+}
+
+// Parse state from church id (e.g. "TX-123" -> "TX", "community-CA-xxx" -> "CA")
+function stateFromChurchId(id:string):string|null{
+  if(!id||typeof id!=="string")return null;
+  const t=id.trim();
+  if(t.startsWith("community-")){const p=t.split("-");if(p.length>=2)return (p[1]||"").toUpperCase().slice(0,2)||null;return null;}
+  const dash=t.indexOf("-");if(dash>0){const st=t.slice(0,dash).toUpperCase();if(st.length===2)return st;}
+  return null;
+}
+
+// Resolve homeCampus summary when homeCampusId points to another state
+async function resolveHomeCampus(churches:any[],currentState:string):Promise<void>{
+  const meta=await kv.get("churches:meta");const stateCounts=meta?.stateCounts||{};
+  for(const ch of churches){
+    const hid=(ch as any).homeCampusId;if(!hid||typeof hid!=="string")continue;
+    const otherSt=stateFromChurchId(hid);if(!otherSt||otherSt===currentState)continue;
+    if(!stateCounts[otherSt])continue;
+    const otherCh=await kv.get(`churches:${otherSt}`);if(!Array.isArray(otherCh))continue;
+    const main=otherCh.find((c:any)=>c.id===hid);if(!main){continue;}
+    const shortId=toShortId(main.id,main.state||otherSt,main.shortId);
+    (ch as any).homeCampus={id:main.id,name:main.name||"Unknown",state:otherSt,shortId};
   }
 }
 
@@ -447,6 +490,7 @@ app.get(`${P}/churches/:state`,async(c)=>{
     let cal=await kv.get(`calibration:${st}`);
     if(!cal||!cal.medians){cal=await computeCalibrationForState(st,ch);try{await kv.set(`calibration:${st}`,cal);}catch(_){}}
     if(Object.keys(cal.medians||{}).length)applyCalibrationToChurches(withShort,cal);
+    await resolveHomeCampus(withShort,st);
     return c.json({churches:withShort,state:{abbrev:info.a,name:info.n,lat:info.la,lng:info.lo},count:withShort.length,fromCache:true});
   }catch(e){return c.json({churches:[],error:`${e}`},500);}
 });
@@ -557,7 +601,7 @@ function normalizePhone(s:string):string{
   if(digits.length<10)return "";
   return digits;
 }
-const VF=["name","website","address","attendance","denomination","serviceTimes","languages","ministries","pastorName","pastorRole","phone","email"];
+const VF=["name","website","address","attendance","denomination","serviceTimes","languages","ministries","pastorName","pastorRole","phone","email","homeCampusId"];
 function consensus(subs:any[]){
   const res:Record<string,any>={};
   for(const f of VF){
@@ -651,6 +695,7 @@ async function applyApprovedCorrections(churchId:string,con:Record<string,any>):
         }
         else if(f==="phone"){(ch as any).phone=normalizePhone(String(v))||undefined;}
         else if(f==="pastorRole"){const r=String(v).trim();if(r==="lead"||r==="campus")(ch as any).pastorRole=r;}
+        else if(f==="homeCampusId"){(ch as any).homeCampusId=(String(v).trim()||undefined);}
         else{(ch as any)[f]=v;}
       }
       ch.lastVerified=Date.now();updated=true;break;
@@ -679,6 +724,7 @@ app.post(`${P}/suggestions`,async(c)=>{
     if(field==="denomination"&&isBlockedDenomination(String(value)))return c.json({error:"Denomination not supported"},400);
     if(field==="attendance"){const n=parseInt(value);if(isNaN(n)||n<1||n>50000)return c.json({error:"Attendance 1-50000"},400);}
     if(field==="pastorRole"){const r=String(value).trim();if(r!=="lead"&&r!=="campus")return c.json({error:"Pastor role must be lead or campus"},400);}
+    if(field==="homeCampusId"){const v=String(value).trim();if(!v)return c.json({error:"Main campus ID required"},400);if(!stateFromChurchId(v))return c.json({error:"Invalid church ID format"},400);}
     let storeValue=String(value??"").trim();
     if(!storeValue)return c.json({error:"Value is required"},400);
     if(field==="name"&&storeValue.length<2)return c.json({error:"Church name must be at least 2 characters"},400);

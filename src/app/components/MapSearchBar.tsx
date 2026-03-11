@@ -6,6 +6,7 @@ import { getFallbackLocation, formatAddressWithCity } from "./church-data";
 import { searchChurches } from "./api";
 import type { SearchResult } from "./api";
 import { getChurchUrlSegment } from "./url-utils";
+import { scoreChurchMatch } from "./search-scoring";
 import { StateFlag } from "./StateFlag";
 import { STATE_NAMES } from "./map-constants";
 import { CloseButton } from "./ui/close-button";
@@ -139,7 +140,7 @@ export function MapSearchBar({
   // Projection matching react-simple-maps (geoAlbersUsa, scale 1000) for viewport filtering
   const projection = useMemo(() => geoAlbersUsa().scale(1000), []);
 
-  // Local search for state view (all matches, no viewport filter)
+  // Local search for state view (all matches, no viewport filter); ranked by name then city/address
   const localResultsRaw = useMemo(() => {
     if (!focusedState || churches.length === 0) return [];
     const q = query.toLowerCase().trim();
@@ -147,13 +148,17 @@ export function MapSearchBar({
     const tokens = q.split(/\s+/).filter(Boolean);
     const matched: Church[] = [];
     for (const ch of churches) {
-      if (matched.length >= MAX_RESULTS_STATE_VIEW) break;
       const haystack = `${ch.name} ${ch.city} ${ch.denomination} ${ch.address || ""}`.toLowerCase();
       if (tokens.every((t) => haystack.includes(t))) {
         matched.push(ch);
       }
     }
-    return matched;
+    matched.sort(
+      (a, b) =>
+        scoreChurchMatch(q, b) - scoreChurchMatch(q, a) ||
+        (a.name || "").localeCompare(b.name || "")
+    );
+    return matched.slice(0, MAX_RESULTS_STATE_VIEW);
   }, [query, focusedState, churches]);
 
   const isViewportSearchMode = zoom > VIEWPORT_ZOOM_THRESHOLD && !!focusedState;
