@@ -20,8 +20,6 @@ export interface Church {
   languages?: string[];        // e.g. ["English", "Spanish"]
   ministries?: string[];       // e.g. ["Youth", "Music", "Outreach"]
   pastorName?: string;
-  /** "campus" = Campus Pastor (for campuses); "lead" or missing = Lead Pastor */
-  pastorRole?: "lead" | "campus";
   phone?: string;
   email?: string;
   /** When set, this church is a campus; value is the main church's id (e.g. "TX-12345"). */

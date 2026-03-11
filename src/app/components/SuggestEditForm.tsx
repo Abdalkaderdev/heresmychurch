@@ -35,14 +35,14 @@ interface SuggestEditFormProps {
   onChurchUpdated?: () => void;
 }
 
-type EditableField = "name" | "website" | "address" | "attendance" | "denomination" | "serviceTimes" | "languages" | "ministries" | "pastorName" | "pastorRole" | "phone" | "email" | "homeCampusId";
+type EditableField = "name" | "website" | "address" | "attendance" | "denomination" | "serviceTimes" | "languages" | "ministries" | "pastorName" | "phone" | "email" | "homeCampusId";
 
 const FIELD_CONFIG: {
   key: EditableField;
   label: string;
   icon: typeof Globe;
   placeholder: string;
-  type: "text" | "number" | "select" | "address" | "chips-languages" | "chips-ministries" | "select-pastor-role" | "main-campus-search";
+  type: "text" | "number" | "select" | "address" | "chips-languages" | "chips-ministries" | "main-campus-search";
   group: "core" | "extended";
 }[] = [
   { key: "name", label: "Church Name", icon: ChurchIcon, placeholder: "e.g., Grace Community Church", type: "text", group: "core" },
@@ -54,7 +54,6 @@ const FIELD_CONFIG: {
   { key: "languages", label: "Languages", icon: Languages, placeholder: "Select languages offered", type: "chips-languages", group: "extended" },
   { key: "ministries", label: "Ministries", icon: Heart, placeholder: "Select ministries offered", type: "chips-ministries", group: "extended" },
   { key: "pastorName", label: "Pastor Name", icon: User, placeholder: "Pastor John Smith", type: "text", group: "extended" },
-  { key: "pastorRole", label: "Pastor Role", icon: User, placeholder: "Lead or Campus Pastor", type: "select-pastor-role", group: "extended" },
   { key: "phone", label: "Phone", icon: Phone, placeholder: "(555) 123-4567", type: "text", group: "extended" },
   { key: "email", label: "Email", icon: Mail, placeholder: "info@church.org", type: "text", group: "extended" },
   { key: "homeCampusId", label: "Link to main campus", icon: Link2, placeholder: "Search for the main campus...", type: "main-campus-search", group: "extended" },
@@ -72,7 +71,6 @@ function isFieldEmpty(church: Church, field: EditableField): boolean {
     case "languages": return !church.languages || church.languages.length === 0;
     case "ministries": return !church.ministries || church.ministries.length === 0;
     case "pastorName": return !church.pastorName;
-    case "pastorRole": return false;
     case "phone": return !church.phone;
     case "email": return !church.email;
     case "homeCampusId": return !church.homeCampusId;
@@ -95,7 +93,6 @@ function getCurrentValue(church: Church, field: EditableField): string {
     case "languages": return (church.languages || []).join(", ");
     case "ministries": return (church.ministries || []).join(", ");
     case "pastorName": return church.pastorName || "";
-    case "pastorRole": return church.pastorRole === "campus" ? "campus" : "lead";
     case "phone": return church.phone || "";
     case "email": return church.email || "";
     case "homeCampusId": return church.homeCampusId || "";
@@ -453,11 +450,9 @@ function FieldCard({
   const currentValue = getCurrentValue(church, key);
   const displayValue = key === "address"
     ? [church.address, church.city, church.state].filter(Boolean).join(", ")
-    : key === "pastorRole"
-      ? (church.pastorRole === "campus" ? "Campus Pastor" : "Lead Pastor")
-      : key === "homeCampusId"
-        ? (church.homeCampus ? `${church.homeCampus.name}, ${church.homeCampus.state}` : church.homeCampusId ? "Linked to main campus" : "")
-        : currentValue;
+    : key === "homeCampusId"
+      ? (church.homeCampus ? `${church.homeCampus.name}, ${church.homeCampus.state}` : church.homeCampusId ? "Linked to main campus" : "")
+      : currentValue;
   const   canSubmitAddress = key !== "address" || (() => {
     const p = parseAddressValue(values[key] ?? "");
     return !!(p.address.trim() && p.city.trim() && p.state.trim());
@@ -645,19 +640,6 @@ function EditInput({
           </button>
         ))}
       </div>
-    );
-  }
-
-  if (fieldKey === "pastorRole" || type === "select-pastor-role") {
-    return (
-      <select
-        value={values[fieldKey] || "lead"}
-        onChange={(e) => setValues((v) => ({ ...v, [fieldKey]: e.target.value }))}
-        className="w-full bg-white/8 rounded-lg px-3 py-2 text-white text-xs border border-white/10 focus:border-purple-500/50 focus:outline-none transition-colors appearance-none"
-      >
-        <option value="lead" className="bg-[#1E1040]">Lead Pastor</option>
-        <option value="campus" className="bg-[#1E1040]">Campus Pastor</option>
-      </select>
     );
   }
 
