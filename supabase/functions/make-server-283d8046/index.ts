@@ -401,26 +401,30 @@ app.get(`${P}/churches/review-stats`,async(c)=>{
   try{
     const meta=await kv.get("churches:meta");const sc:Record<string,number>={...(meta?.stateCounts||{})};
     if(sc["DC"]){sc["MD"]=(sc["MD"]||0)+sc["DC"];delete sc["DC"];}
-    const ps=Object.keys(sc);if(!ps.length)return c.json({states:{},totalChurches:0,totalNeedsReview:0,percentage:0,missingAddress:0,missingServiceTimes:0,missingDenomination:0});
+    const ps=Object.keys(sc).filter(s=>sc[s]>0);
+    if(!ps.length)return c.json({states:{},totalChurches:0,totalNeedsReview:0,percentage:0,missingAddress:0,missingServiceTimes:0,missingDenomination:0});
     const states:Record<string,{total:number;needsReview:number;missingAddress:number;missingServiceTimes:number;missingDenomination:number}>={};
     let totalChurches=0,totalNeedsReview=0,missingAddress=0,missingServiceTimes=0,missingDenomination=0;
-    for(const st of ps){
-      let ch:any[]=await kv.get(`churches:${st}`);
-      if(st==="MD"){try{const dc=await kv.get("churches:DC");if(Array.isArray(dc)&&dc.length){const ids=new Set((ch||[]).map((x:any)=>x.id));for(const x of dc)if(!ids.has(x.id))ch=(ch||[]).concat([{...x,state:"MD"}]);}}catch(_){}}
-      if(!Array.isArray(ch)||!ch.length){if(!states[st])states[st]={total:0,needsReview:0,missingAddress:0,missingServiceTimes:0,missingDenomination:0};continue;}
-      const corrections=await getApprovedCorrectionsForState(st);
-      mergeCorrectionsIntoChurches(ch,corrections);
-      let need=0,ma=0,ms=0,md=0;
-      for(const church of ch){
-        const r=churchNeedsReview(church);
-        if(r.needsReview)need++;
-        if(r.missingAddress)ma++;
-        if(r.missingServiceTimes)ms++;
-        if(r.missingDenomination)md++;
+    const BATCH=10;
+    for(let i=0;i<ps.length;i+=BATCH){
+      const batch=ps.slice(i,i+BATCH);
+      const keys=batch.map(st=>`churches:${st}`);
+      const values=await kv.mget(keys);
+      for(let j=0;j<batch.length;j++){
+        const st=batch[j];
+        let ch:any[]=values[j];
+        if(!Array.isArray(ch)||!ch.length){states[st]={total:0,needsReview:0,missingAddress:0,missingServiceTimes:0,missingDenomination:0};continue;}
+        let need=0,ma=0,ms=0,md=0;
+        for(const church of ch){
+          const r=churchNeedsReview(church);
+          if(r.needsReview)need++;
+          if(r.missingAddress)ma++;
+          if(r.missingServiceTimes)ms++;
+          if(r.missingDenomination)md++;
+        }
+        states[st]={total:ch.length,needsReview:need,missingAddress:ma,missingServiceTimes:ms,missingDenomination:md};
+        totalChurches+=ch.length;totalNeedsReview+=need;missingAddress+=ma;missingServiceTimes+=ms;missingDenomination+=md;
       }
-      if(!states[st])states[st]={total:0,needsReview:0,missingAddress:0,missingServiceTimes:0,missingDenomination:0};
-      states[st].total+=ch.length;states[st].needsReview+=need;states[st].missingAddress+=ma;states[st].missingServiceTimes+=ms;states[st].missingDenomination+=md;
-      totalChurches+=ch.length;totalNeedsReview+=need;missingAddress+=ma;missingServiceTimes+=ms;missingDenomination+=md;
     }
     const percentage=totalChurches>0?Math.round((totalNeedsReview/totalChurches)*1000)/10:0;
     return c.json({states,totalChurches,totalNeedsReview,percentage,missingAddress,missingServiceTimes,missingDenomination});
