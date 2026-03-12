@@ -10,6 +10,8 @@
   },
   "rewrites": [
     { "source": "/api/churches/:path*", "destination": "/api/churches?path=:path*" },
+    { "source": "/api/suggestions/:path*", "destination": "/api/suggestions?path=:path*" },
+    { "source": "/api/community/:path*", "destination": "/api/community?path=:path*" },
     { "source": "/:path((?!api/).*)", "destination": "/index.html" }
   ]
 }

@@ -102,8 +102,10 @@ async function handleHistory(req: VercelRequest, res: VercelResponse, churchId: 
 // ============================================================================
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Parse path from query string (rewrite passes it as string like "stats" or "history/LB-123")
   const pathParam = req.query.path;
-  const path = Array.isArray(pathParam) ? pathParam : pathParam ? [pathParam] : [];
+  const pathStr = Array.isArray(pathParam) ? pathParam.join('/') : (pathParam || '');
+  const path = pathStr ? pathStr.split('/').filter(Boolean) : [];
   const route = path.join('/');
 
   // GET /community/stats
