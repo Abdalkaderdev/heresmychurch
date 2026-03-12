@@ -10,13 +10,11 @@ import {
 } from "./api";
 import {
   GEO_URL,
-  COUNTIES_GEO_URL,
-  FIPS_TO_STATE,
-  STATE_TO_FIPS,
+  COUNTRY_CODE_TO_ABBREV,
   filterToStateBounds,
   getStateZoom,
+  MIDDLE_EAST_COUNTRIES,
 } from "./map-constants";
-import { COUNTY_POPULATIONS } from "./data/county-populations";
 import { getChurchUrlSegment } from "./url-utils";
 
 /** Match church by route segment (legacy id or numeric shortId). */
@@ -101,57 +99,8 @@ export function useChurchMapData({
   // ── Sub-hook: UI state (filters, tooltips, modals) ──
   const ui = useUIState(focusedState);
 
-  // County-level church counts and per-capita (point-in-polygon vs county TopoJSON)
-  const countyStats = useMemo(() => {
-    if (!focusedState || !countyFeatures?.size || churches.length === 0) return null;
-    const stateFips = STATE_TO_FIPS[focusedState];
-    if (!stateFips) return null;
-    const stateCounties = Array.from(countyFeatures.entries()).filter(([key]) => key.substring(0, 2) === stateFips);
-    const countyNames: Record<string, string> = {};
-    for (const [key, feat] of stateCounties) {
-      countyNames[key] = (feat.properties?.name as string) ?? `County ${key}`;
-    }
-    const byFips: Record<string, { churchCount: number; population: number; perCapita: number; peoplePer: number; name: string }> = {};
-    for (const church of churches) {
-      let fips: string | null = null;
-      for (const [key, feat] of stateCounties) {
-        if (geoContains(feat, [church.lng, church.lat])) {
-          fips = key;
-          break;
-        }
-      }
-      if (!fips) continue;
-      const pop = COUNTY_POPULATIONS[fips] ?? 0;
-      if (!byFips[fips]) {
-        byFips[fips] = { churchCount: 0, population: pop, perCapita: 0, peoplePer: 0, name: countyNames[fips] ?? `County ${fips}` };
-      }
-      byFips[fips].churchCount += 1;
-    }
-    const sorted: Array<{ fips: string; name: string; churchCount: number; population: number; perCapita: number; peoplePer: number }> = [];
-    for (const [fips, data] of Object.entries(byFips)) {
-      const pop = data.population || 1;
-      const perCapita = data.churchCount / pop;
-      const peoplePer = Math.round(pop / data.churchCount);
-      sorted.push({
-        fips,
-        name: data.name,
-        churchCount: data.churchCount,
-        population: data.population,
-        perCapita,
-        peoplePer,
-      });
-    }
-    sorted.sort((a, b) => b.perCapita - a.perCapita);
-    return {
-      byFips: Object.fromEntries(
-        Object.entries(byFips).map(([f, d]) => [
-          f,
-          { ...d, perCapita: d.churchCount / (d.population || 1), peoplePer: Math.round((d.population || 1) / d.churchCount) },
-        ])
-      ),
-      sortedByPerCapita: sorted,
-    };
-  }, [focusedState, countyFeatures, churches]);
+  // County stats not applicable for Middle East (no sub-national boundaries)
+  const countyStats = null;
 
   // ── Sub-hook: filtered churches + derived stats ──
   const filters = useChurchFilters(
@@ -208,7 +157,7 @@ export function useChurchMapData({
   // ── Mobile church-view offset: shifts pin above the 55vh detail panel ──
   const getMobileLatOffset = (targetZoom: number): number => {
     // The panel covers the bottom 55vh. The map SVG (viewBox 800×600,
-    // geoAlbersUsa scale 1000) renders letterboxed inside the full viewport.
+    // geoMercator scale 600) renders letterboxed inside the full viewport.
     // We shift the center south so the pin falls in the middle of the
     // visible area instead of behind the panel.
     const vh = window.innerHeight;
@@ -221,8 +170,8 @@ export function useChurchMapData({
     const visibleCenter = (Math.max(mapTop, 0) + Math.min(panelTop, mapTop + renderedH)) / 2;
     const shiftPx = mapCenter - visibleCenter;
     // Convert screen-px shift → projected SVG units → latitude degrees
-    // (~16.8 projected units per degree for geoAlbersUsa at scale 1000)
-    return shiftPx / (svgScale * targetZoom * 16.8);
+    // (~10 projected units per degree for geoMercator at scale 600)
+    return shiftPx / (svgScale * targetZoom * 10);
   };
 
   const moveToChurchView = (lng: number, lat: number, targetZoom: number) => {
@@ -691,42 +640,28 @@ export function useChurchMapData({
           console.warn("[ChurchMap] Invalid topology data");
           return;
         }
-        const geojson = feature(topology, topology.objects.states) as any;
+        // world-atlas uses "countries" object
+        const geojson = feature(topology, topology.objects.countries) as any;
         const featureMap = new Map<string, any>();
         if (geojson && Array.isArray(geojson.features)) {
           for (const f of geojson.features) {
-            const abbrev = FIPS_TO_STATE[String(f.id).padStart(2, "0")];
-            if (abbrev) featureMap.set(abbrev, f);
+            // Numeric ISO 3166-1 code to alpha-2 abbreviation
+            const numericCode = String(f.id);
+            const abbrev = COUNTRY_CODE_TO_ABBREV[numericCode];
+            // Only include Middle East countries
+            if (abbrev && MIDDLE_EAST_COUNTRIES.includes(abbrev)) {
+              featureMap.set(abbrev, f);
+            }
           }
         }
         refs.current.stateFeatures = featureMap;
-        console.log(`[ChurchMap] Loaded topojson features for ${featureMap.size} states`);
+        console.log(`[ChurchMap] Loaded topojson features for ${featureMap.size} countries`);
       })
       .catch((err) =>
         console.warn("[ChurchMap] Failed to load topojson for polygon filtering:", err)
       );
 
-    fetch(COUNTIES_GEO_URL)
-      .then((res) => res.json())
-      .then((topology: any) => {
-        if (!topology?.objects?.counties) {
-          console.warn("[ChurchMap] Invalid counties topology");
-          return;
-        }
-        const geojson = feature(topology, topology.objects.counties) as any;
-        const countyMap = new Map<string, any>();
-        if (geojson?.features) {
-          for (const f of geojson.features) {
-            const fips = String(f.id ?? "").padStart(5, "0");
-            if (fips.length === 5) countyMap.set(fips, f);
-          }
-        }
-        setCountyFeatures(countyMap);
-        console.log(`[ChurchMap] Loaded county features for ${countyMap.size} counties`);
-      })
-      .catch((err) =>
-        console.warn("[ChurchMap] Failed to load county topojson:", err)
-      );
+    // No county-level data for Middle East
 
     fetchStatePopulations()
       .then((data) => {
@@ -739,16 +674,13 @@ export function useChurchMapData({
         console.warn("[ChurchMap] Failed to load state populations:", err);
       });
 
-    // Detect user's state from edge-injected meta (Netlify context.geo; DC → MD)
+    // Detect user's country from edge-injected meta (Netlify context.geo)
     const regionMeta = document.querySelector('meta[name="x-user-region"]');
     if (regionMeta) {
-      let abbrev = regionMeta.getAttribute("content")?.toUpperCase() ?? "";
-      if (abbrev === "DC") abbrev = "MD";
-      const valid = new Set([
-        "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
-      ]);
+      const abbrev = regionMeta.getAttribute("content")?.toUpperCase() ?? "";
+      const valid = new Set(MIDDLE_EAST_COUNTRIES);
       if (valid.has(abbrev)) {
-        console.log(`[ChurchMap] Detected user state via geo: ${abbrev}`);
+        console.log(`[ChurchMap] Detected user country via geo: ${abbrev}`);
         setDetectedState(abbrev);
       }
     }
@@ -868,7 +800,7 @@ export function useChurchMapData({
     } else if (focusedState && focusedStateName) {
       document.title = `Churches in ${focusedStateName} | Here's My Church`;
     } else {
-      document.title = "Here's My Church";
+      document.title = "Here's My Church - Middle East";
     }
   }, [selectedChurch, focusedState, focusedStateName]);
 
@@ -877,7 +809,7 @@ export function useChurchMapData({
   useEffect(() => {
     let el = document.getElementById(CHURCH_JSONLD_ID) as HTMLScriptElement | null;
     if (selectedChurch && focusedState) {
-      const url = `https://heresmychurch.com/state/${focusedState}/${getChurchUrlSegment(selectedChurch, focusedState)}`;
+      const url = `https://heresmychurch.com/country/${focusedState}/${getChurchUrlSegment(selectedChurch, focusedState)}`;
       const address =
         selectedChurch.address
           ? { "@type": "PostalAddress" as const, streetAddress: selectedChurch.address, addressLocality: selectedChurch.city || undefined, addressRegion: selectedChurch.state || undefined }
@@ -1100,7 +1032,7 @@ const initialDataState: DataState = {
   detectedState: null,
   loadingStateName: "",
   zoom: 1,
-  center: [-96, 38] as [number, number],
+  center: [40, 28] as [number, number],  // Middle East center
   isTransitioning: false,
   countyFeatures: null,
 };
@@ -1163,7 +1095,7 @@ function dataReducer(state: DataState, action: DataAction): DataState {
         selectedChurch: null,
         loadingStateName: "",
         zoom: 1,
-        center: [-96, 38] as [number, number],
+        center: [40, 28] as [number, number],
       };
     default:
       return state;

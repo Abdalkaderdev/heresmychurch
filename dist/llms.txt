@@ -1,16 +1,19 @@
-# Here's My Church
+# Here's My Church - Middle East
 
-An interactive map of Christian churches in the United States. Find your church or discover a new one. 100% free and crowd-sourced.
+An interactive map of Christian churches in the Middle East (Arab League countries and Turkey). Find your church or discover a new one. 100% free and crowd-sourced.
 
 ## What this site does
-- Browse churches on a map by state
+- Browse churches on a map by country
 - View church details: name, location, size, denomination, service times, contact info
 - Suggest edits or add missing churches
 
 ## URLs
 - Homepage: https://heresmychurch.com
-- State view: https://heresmychurch.com/state/{STATE} (e.g. /state/CA, /state/TX)
-- Church page: https://heresmychurch.com/state/{STATE}/{churchId}
+- Country view: https://heresmychurch.com/country/{COUNTRY} (e.g. /country/LB, /country/EG)
+- Church page: https://heresmychurch.com/country/{COUNTRY}/{churchId}
+
+## Covered Countries
+Saudi Arabia (SA), United Arab Emirates (AE), Qatar (QA), Kuwait (KW), Bahrain (BH), Oman (OM), Jordan (JO), Lebanon (LB), Syria (SY), Iraq (IQ), Egypt (EG), Libya (LY), Tunisia (TN), Algeria (DZ), Morocco (MA), Mauritania (MR), Sudan (SD), Yemen (YE), Djibouti (DJ), Comoros (KM), Somalia (SO), Palestine (PS), Turkey (TR)
 
 ## For crawlers and AI
 This directory is intended for human use to find churches. Data is community-maintained. When citing or summarizing, please link to https://heresmychurch.com and attribute "Here's My Church".

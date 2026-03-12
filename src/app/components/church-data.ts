@@ -234,31 +234,37 @@ export function getSizeCategory(attendance: number) {
 }
 
 // Major denomination groups for filtering (order matters: first match wins)
+// Middle East Christian traditions
 export const DENOMINATION_GROUPS: { label: string; matches: string[] }[] = [
-  { label: "Catholic", matches: ["Catholic"] },
-  { label: "Baptist", matches: ["Baptist"] },
-  { label: "Methodist", matches: ["Methodist", "Wesleyan"] },
+  // Orthodox (largest Christian presence in Middle East)
+  { label: "Coptic Orthodox", matches: ["Coptic Orthodox"] },
+  { label: "Greek Orthodox", matches: ["Greek Orthodox", "Rum Orthodox"] },
+  { label: "Armenian Apostolic", matches: ["Armenian Apostolic", "Armenian Orthodox"] },
+  { label: "Syriac Orthodox", matches: ["Syriac Orthodox", "Syrian Orthodox"] },
+  { label: "Other Orthodox", matches: ["Orthodox", "Antiochian", "Ethiopian Orthodox", "Eritrean Orthodox"] },
+  // Eastern Catholic (in communion with Rome)
+  { label: "Maronite", matches: ["Maronite"] },
+  { label: "Melkite", matches: ["Melkite"] },
+  { label: "Chaldean", matches: ["Chaldean"] },
+  { label: "Eastern Catholic", matches: ["Coptic Catholic", "Armenian Catholic", "Syriac Catholic", "Syrian Catholic"] },
+  // Latin Catholic
+  { label: "Catholic", matches: ["Catholic", "Roman Catholic", "Latin Catholic"] },
+  // Assyrian Church of the East
+  { label: "Assyrian", matches: ["Assyrian", "Church of the East"] },
+  // Protestant
+  { label: "Anglican", matches: ["Anglican", "Episcopal", "Church of England"] },
   { label: "Lutheran", matches: ["Lutheran"] },
   { label: "Presbyterian", matches: ["Presbyterian"] },
-  { label: "Episcopal", matches: ["Episcopal", "Anglican"] },
-  // Pentecostal before "Church of God" so "Church of God in Christ" maps here
-  { label: "Pentecostal", matches: ["Pentecostal", "Foursquare", "Full Gospel", "Apostolic", "Church of God in Christ", "COGIC"] },
+  { label: "Methodist", matches: ["Methodist", "Wesleyan"] },
+  { label: "Baptist", matches: ["Baptist"] },
+  // Evangelical/Pentecostal
   { label: "Assemblies of God", matches: ["Assemblies of God", "Assembly of God"] },
-  { label: "Church of Christ", matches: ["Church of Christ"] },
-  { label: "Church of God", matches: ["Church of God"] },
-  { label: "Orthodox", matches: ["Orthodox", "Coptic", "Antiochian"] },
-  { label: "Seventh-day Adventist", matches: ["Seventh-day Adventist"] },
-  { label: "Evangelical", matches: ["Evangelical", "Alliance", "Moravian", "Evangelical Free", "EFCA", "Free Church"] },
-  { label: "Nazarene", matches: ["Nazarene"] },
-  { label: "Congregational", matches: ["Congregational"] },
-  { label: "Disciples of Christ", matches: ["Disciples of Christ"] },
-  { label: "Mennonite", matches: ["Mennonite", "Brethren", "Hutterite"] },
-  { label: "Amish", matches: ["Amish"] },
-  { label: "Reformed", matches: ["Reformed"] },
-  { label: "Quaker", matches: ["Quaker", "Friends"] },
-  { label: "Covenant", matches: ["Covenant"] },
+  { label: "Pentecostal", matches: ["Pentecostal", "Foursquare", "Full Gospel"] },
+  { label: "Evangelical", matches: ["Evangelical", "Bible Church"] },
+  // Other
+  { label: "Seventh-day Adventist", matches: ["Seventh-day Adventist", "Adventist", "SDA"] },
   { label: "Salvation Army", matches: ["Salvation Army"] },
-  { label: "Non-denominational", matches: ["Non-denominational", "Nondenominational", "Non denominational", "Calvary Chapel", "Vineyard", "Bible Church", "Bible Fellowship", "Community Church", "Independent"] },
+  { label: "Non-denominational", matches: ["Non-denominational", "Nondenominational", "Community Church", "International Church", "Fellowship", "Independent"] },
   { label: "Unspecified", matches: ["Other", "Unknown"] }, // catch-all
 ];
 
@@ -271,48 +277,50 @@ export function getDenominationGroup(denomination: string): string {
   return "Unspecified";
 }
 
-// ── Bilingual probability estimation ──
+// ── Multilingual probability estimation ──
 // Heuristic estimation until community-confirmed via languages field
 
-// State-level Hispanic population share (approx % from Census 2020)
-const STATE_HISPANIC_SHARE: Record<string, number> = {
-  NM: 0.48, TX: 0.40, CA: 0.39, AZ: 0.31, NV: 0.29, FL: 0.27, CO: 0.22,
-  NJ: 0.21, NY: 0.19, IL: 0.18, CT: 0.17, RI: 0.16, UT: 0.15, OR: 0.14,
-  WA: 0.13, KS: 0.13, NE: 0.12, MA: 0.12, ID: 0.13, GA: 0.10, NC: 0.10,
-  MD: 0.11, VA: 0.10, OK: 0.12, IN: 0.08, WI: 0.07, MN: 0.06, PA: 0.08,
-  IA: 0.06, SC: 0.06, AR: 0.08, TN: 0.06, HI: 0.11, AK: 0.07, DE: 0.10,
+// Country-level expat/multilingual probability (estimate)
+// Gulf states have high expat populations; Lebanon/Egypt/Syria have multiple native Christian communities
+const COUNTRY_MULTILINGUAL_SHARE: Record<string, number> = {
+  AE: 0.85, QA: 0.80, KW: 0.75, BH: 0.70, OM: 0.65, SA: 0.50, // Gulf expat communities
+  LB: 0.60, // Arabic + French + Armenian + other
+  EG: 0.30, SY: 0.30, IQ: 0.40, JO: 0.35, // Mixed Arab Christian communities
+  TR: 0.20, PS: 0.25, // Smaller multilingual presence
+  LY: 0.15, TN: 0.15, DZ: 0.20, MA: 0.25, MR: 0.10, // North Africa
+  SD: 0.20, YE: 0.15, DJ: 0.30, KM: 0.10, SO: 0.15, // East Africa/Arabian Peninsula
 };
 
-// Name patterns that strongly indicate non-English services
+// Name patterns that indicate specific language services
 const BILINGUAL_NAME_PATTERNS = [
-  // Spanish
-  { pattern: /\biglesia\b/i, lang: "Spanish", weight: 0.95 },
-  { pattern: /\bcristiana?\b/i, lang: "Spanish", weight: 0.7 },
-  { pattern: /\bhispana?\b/i, lang: "Spanish", weight: 0.95 },
-  { pattern: /\blatino?a?\b/i, lang: "Spanish", weight: 0.9 },
-  { pattern: /\bcomunidad\b/i, lang: "Spanish", weight: 0.85 },
-  { pattern: /\bdios\b/i, lang: "Spanish", weight: 0.8 },
-  { pattern: /\bespíritu|espiritu\b/i, lang: "Spanish", weight: 0.85 },
-  { pattern: /\bcapilla\b/i, lang: "Spanish", weight: 0.9 },
-  // Portuguese
-  { pattern: /\bigreja\b/i, lang: "Portuguese", weight: 0.95 },
-  { pattern: /\bbrasileir[oa]\b/i, lang: "Portuguese", weight: 0.95 },
-  // Korean
+  // Arabic
+  { pattern: /\bكنيسة|كنيست|مسيحي\b/i, lang: "Arabic", weight: 0.95 },
+  { pattern: /\barabic\b/i, lang: "Arabic", weight: 0.9 },
+  // Armenian
+  { pattern: /armenian|armén|հdelays/i, lang: "Armenian", weight: 0.95 },
+  // Syriac/Aramaic
+  { pattern: /\bsyriac|aramaic|ܥܕܬܐ\b/i, lang: "Syriac", weight: 0.95 },
+  // Coptic
+  { pattern: /\bcoptic|قبطي\b/i, lang: "Coptic/Arabic", weight: 0.9 },
+  // Filipino (large expat community in Gulf)
+  { pattern: /\bfilipino|tagalog|pinoy\b/i, lang: "Tagalog", weight: 0.9 },
+  // Malayalam (Kerala Christian community in Gulf)
+  { pattern: /\bmalayalam|kerala|marthoma\b/i, lang: "Malayalam", weight: 0.9 },
+  // French (North Africa, Lebanon)
+  { pattern: /\bfrench|français|francophone\b/i, lang: "French", weight: 0.85 },
+  { pattern: /\béglise\b/i, lang: "French", weight: 0.9 },
+  // English expat churches
+  { pattern: /\binternational|expat|fellowship\b/i, lang: "English", weight: 0.7 },
+  // Ethiopian/Eritrean
+  { pattern: /\bethiopian|eritrean|amharic|tigrinya\b/i, lang: "Amharic", weight: 0.9 },
+  // Turkish
+  { pattern: /\bturkish|türk\b/i, lang: "Turkish", weight: 0.85 },
+  // Korean expat
   { pattern: /한인|한국|교회/i, lang: "Korean", weight: 0.95 },
   { pattern: /\bkorean\b/i, lang: "Korean", weight: 0.9 },
-  // Chinese
+  // Chinese expat
   { pattern: /中[华文国]|華人|教會/i, lang: "Chinese", weight: 0.95 },
   { pattern: /\bchinese\b/i, lang: "Chinese", weight: 0.9 },
-  // Vietnamese
-  { pattern: /\bvietnamese\b/i, lang: "Vietnamese", weight: 0.9 },
-  { pattern: /việt|giáo\s*xứ/i, lang: "Vietnamese", weight: 0.95 },
-  // Other
-  { pattern: /\bhaitian\b/i, lang: "Haitian Creole", weight: 0.9 },
-  { pattern: /\bethiopian|eritrean\b/i, lang: "Amharic", weight: 0.85 },
-  { pattern: /\bfilipino|tagalog\b/i, lang: "Tagalog", weight: 0.9 },
-  { pattern: /\barabic?\b/i, lang: "Arabic", weight: 0.85 },
-  { pattern: /\bbilingual\b/i, lang: "Bilingual", weight: 0.95 },
-  { pattern: /\bmulticultural|multi-ethnic\b/i, lang: "Multilingual", weight: 0.7 },
 ];
 
 export function estimateBilingualProbability(church: Church): { probability: number; detectedLanguage?: string; confirmed: boolean } {
@@ -347,36 +355,33 @@ export function estimateBilingualProbability(church: Church): { probability: num
     return { probability: maxProb, detectedLanguage: detectedLang, confirmed: false };
   }
 
-  // State + denomination heuristic
-  const hispanicShare = STATE_HISPANIC_SHARE[church.state] || 0.05;
+  // Country + denomination heuristic for Middle East
+  const multilingualShare = COUNTRY_MULTILINGUAL_SHARE[church.state] || 0.15;
 
-  // Catholic churches in high-Hispanic states have higher bilingual probability
-  if (church.denomination === "Catholic") {
-    const prob = Math.min(hispanicShare * 1.2, 0.6); // Cap at 60%
-    if (prob > 0.1) {
-      return { probability: prob, detectedLanguage: "Spanish", confirmed: false };
-    }
+  // Orthodox churches in Arab countries often have Arabic services
+  if (church.denomination?.includes("Orthodox") && multilingualShare > 0.2) {
+    return { probability: Math.min(multilingualShare * 1.2, 0.8), detectedLanguage: "Arabic", confirmed: false };
   }
 
-  // Pentecostal/AG in high-Hispanic states
-  if ((church.denomination === "Pentecostal" || church.denomination === "Assemblies of God") && hispanicShare > 0.15) {
-    return { probability: hispanicShare * 0.8, detectedLanguage: "Spanish", confirmed: false };
+  // Expat churches in Gulf states often have English + Filipino/Malayalam
+  if (church.denomination === "Non-denominational" && ["AE", "QA", "KW", "BH", "OM", "SA"].includes(church.state)) {
+    return { probability: 0.6, detectedLanguage: "English", confirmed: false };
   }
 
-  // Very low base probability for any church in a diverse state
-  if (hispanicShare > 0.2) {
-    return { probability: hispanicShare * 0.15, confirmed: false };
+  // Base probability for any church in a multilingual country
+  if (multilingualShare > 0.3) {
+    return { probability: multilingualShare * 0.3, confirmed: false };
   }
 
   return { probability: 0, confirmed: false };
 }
 
-// Common language options for form UI
+// Common language options for form UI (Middle East region)
 export const COMMON_LANGUAGES = [
-  "English", "Spanish", "Korean", "Chinese (Mandarin)", "Chinese (Cantonese)",
-  "Portuguese", "Vietnamese", "Tagalog", "French", "Haitian Creole",
-  "Arabic", "Amharic", "Swahili", "Russian", "Hindi", "Japanese",
-  "American Sign Language (ASL)", "Other",
+  "Arabic", "English", "French", "Armenian", "Syriac", "Coptic",
+  "Turkish", "Tagalog", "Malayalam", "Hindi", "Urdu",
+  "Amharic", "Tigrinya", "Korean", "Chinese (Mandarin)",
+  "Russian", "Greek", "Persian (Farsi)", "Other",
 ];
 
 // Common ministry categories for form UI

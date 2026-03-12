@@ -1,21 +1,31 @@
 import { useLocation, useNavigate } from "react-router";
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useEffect } from "react";
 import { ChurchMap } from "./ChurchMap";
 
 /**
  * Thin routing wrapper — parses URL params and passes navigation
  * callbacks down to ChurchMap. This keeps all React Router logic
  * in one place so ChurchMap doesn't need to import router hooks directly.
- * URLs: /state/MO/16692500 (shortId) or /state/MO/church/legacy-id (legacy).
+ * URLs: /country/LB/16692500 (shortId) or /country/LB/church/legacy-id (legacy).
  */
 export function ChurchMapPage() {
   const location = useLocation();
   const nav = useNavigate();
 
+  // Redirect legacy /state/ URLs to /country/
+  useEffect(() => {
+    if (location.pathname.startsWith("/state/")) {
+      const newPath = location.pathname.replace(/^\/state\//, "/country/");
+      nav(newPath + location.search, { replace: true });
+    }
+  }, [location.pathname, location.search, nav]);
+
   const routeParams = useMemo(() => {
     const parts = location.pathname.split("/").filter(Boolean);
-    const stateAbbrev =
-      parts[0] === "state" && parts[1] ? parts[1].toUpperCase() : null;
+    // Support both /country/ and legacy /state/ (before redirect)
+    const isCountryRoute = parts[0] === "country" || parts[0] === "state";
+    const countryCode =
+      isCountryRoute && parts[1] ? parts[1].toUpperCase() : null;
     const segment1 = parts[2];
     const segment2 = parts[3];
     const legacyChurchId =
@@ -26,20 +36,20 @@ export function ChurchMapPage() {
       segment1 && segment1 !== "church" ? segment1 : null;
     const openReviewModalFromQuery =
       new URLSearchParams(location.search).get("review") === "true";
-    return { stateAbbrev, churchShortId, legacyChurchId, openReviewModalFromQuery };
+    return { stateAbbrev: countryCode, churchShortId, legacyChurchId, openReviewModalFromQuery };
   }, [location.pathname, location.search]);
 
   const navigateToState = useCallback(
-    (abbrev: string) => nav(`/state/${abbrev}`),
+    (abbrev: string) => nav(`/country/${abbrev}`),
     [nav]
   );
   const navigateToStateWithReview = useCallback(
-    (abbrev: string) => nav(`/state/${abbrev}?review=true`),
+    (abbrev: string) => nav(`/country/${abbrev}?review=true`),
     [nav]
   );
   const navigateToChurch = useCallback(
-    (stateAbbrev: string, churchShortId: string, options?: { replace?: boolean }) =>
-      nav(`/state/${stateAbbrev}/${churchShortId}`, options ?? {}),
+    (countryCode: string, churchShortId: string, options?: { replace?: boolean }) =>
+      nav(`/country/${countryCode}/${churchShortId}`, options ?? {}),
     [nav]
   );
   const navigateToNational = useCallback(() => nav("/"), [nav]);

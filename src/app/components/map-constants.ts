@@ -22,145 +22,158 @@ export const WAITING_SAYINGS = [
   { text: "David was anointed king as a teenager but waited roughly 15 years before taking the throne.", ref: "1 Samuel 16:13" },
 ];
 
-// Map FIPS IDs to state abbreviations for click detection
-export const FIPS_TO_STATE: Record<string, string> = {
-  "01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA",
-  "08": "CO", "09": "CT", "10": "DE", "11": "MD", "12": "FL",
-  "13": "GA", "15": "HI", "16": "ID", "17": "IL", "18": "IN",
-  "19": "IA", "20": "KS", "21": "KY", "22": "LA", "23": "ME",
-  "24": "MD", "25": "MA", "26": "MI", "27": "MN", "28": "MS",
-  "29": "MO", "30": "MT", "31": "NE", "32": "NV", "33": "NH",
-  "34": "NJ", "35": "NM", "36": "NY", "37": "NC", "38": "ND",
-  "39": "OH", "40": "OK", "41": "OR", "42": "PA", "44": "RI",
-  "45": "SC", "46": "SD", "47": "TN", "48": "TX", "49": "UT",
-  "50": "VT", "51": "VA", "53": "WA", "54": "WV", "55": "WI",
-  "56": "WY",
+// Map ISO 3166-1 numeric codes to country codes (ISO 3166-1 alpha-2) for click detection
+// Using numeric codes from Natural Earth / world-atlas TopoJSON
+export const COUNTRY_CODE_TO_ABBREV: Record<string, string> = {
+  "682": "SA",  // Saudi Arabia
+  "784": "AE",  // United Arab Emirates
+  "634": "QA",  // Qatar
+  "414": "KW",  // Kuwait
+  "048": "BH",  // Bahrain
+  "512": "OM",  // Oman
+  "400": "JO",  // Jordan
+  "422": "LB",  // Lebanon
+  "760": "SY",  // Syria
+  "368": "IQ",  // Iraq
+  "818": "EG",  // Egypt
+  "434": "LY",  // Libya
+  "788": "TN",  // Tunisia
+  "012": "DZ",  // Algeria
+  "504": "MA",  // Morocco
+  "478": "MR",  // Mauritania
+  "736": "SD",  // Sudan (old code)
+  "729": "SD",  // Sudan (new code)
+  "887": "YE",  // Yemen
+  "262": "DJ",  // Djibouti
+  "174": "KM",  // Comoros
+  "706": "SO",  // Somalia
+  "275": "PS",  // Palestine
+  "792": "TR",  // Turkey
 };
 
-// Reverse lookup: state abbreviation -> FIPS code (for county filtering)
-export const STATE_TO_FIPS: Record<string, string> = Object.fromEntries(
-  Object.entries(FIPS_TO_STATE).map(([fips, abbrev]) => [abbrev, fips])
+// Reverse lookup: country abbreviation -> numeric code
+export const ABBREV_TO_COUNTRY_CODE: Record<string, string> = Object.fromEntries(
+  Object.entries(COUNTRY_CODE_TO_ABBREV).map(([code, abbrev]) => [abbrev, code])
 );
 
-// Approximate bounding boxes for US states [south, west, north, east]
-export const STATE_BOUNDS: Record<string, [number, number, number, number]> = {
-  AL: [30.22, -88.47, 35.01, -84.89], AK: [51.21, -179.15, 71.39, -129.98],
-  AZ: [31.33, -114.81, 37.00, -109.04], AR: [33.00, -94.62, 36.50, -89.64],
-  CA: [32.53, -124.41, 42.01, -114.13], CO: [36.99, -109.06, 41.00, -102.04],
-  CT: [40.95, -73.73, 42.05, -71.79], DE: [38.45, -75.79, 39.84, -75.05],
-  FL: [24.40, -87.63, 31.00, -79.97], GA: [30.36, -85.61, 35.00, -80.84],
-  HI: [18.91, -160.24, 22.24, -154.81], ID: [42.00, -117.24, 49.00, -111.04],
-  IL: [36.97, -91.51, 42.51, -87.02], IN: [37.77, -88.10, 41.76, -84.78],
-  IA: [40.38, -96.64, 43.50, -90.14], KS: [36.99, -102.05, 40.00, -94.59],
-  KY: [36.50, -89.57, 39.15, -81.96], LA: [28.93, -94.04, 33.02, -88.82],
-  ME: [42.98, -71.08, 47.46, -66.95], MD: [37.91, -79.49, 39.72, -75.05],
-  MA: [41.24, -73.50, 42.89, -69.93], MI: [41.70, -90.42, 48.31, -82.12],
-  MN: [43.50, -97.24, 49.38, -89.49], MS: [30.17, -91.66, 34.99, -88.10],
-  MO: [35.99, -95.77, 40.61, -89.10], MT: [44.36, -116.05, 49.00, -104.04],
-  NE: [39.99, -104.05, 43.00, -95.31], NV: [35.00, -120.01, 42.00, -114.04],
-  NH: [42.70, -72.56, 45.31, -70.70], NJ: [38.93, -75.56, 41.36, -73.89],
-  NM: [31.33, -109.05, 37.00, -103.00], NY: [40.50, -79.76, 45.02, -71.86],
-  NC: [33.84, -84.32, 36.59, -75.46], ND: [45.94, -104.05, 49.00, -96.55],
-  OH: [38.40, -84.82, 42.33, -80.52], OK: [33.62, -103.00, 37.00, -94.43],
-  OR: [41.99, -124.57, 46.29, -116.46], PA: [39.72, -80.52, 42.27, -74.69],
-  RI: [41.15, -71.86, 42.02, -71.12], SC: [32.03, -83.35, 35.22, -78.54],
-  SD: [42.48, -104.06, 45.95, -96.44], TN: [34.98, -90.31, 36.68, -81.65],
-  TX: [25.84, -106.65, 36.50, -93.51], UT: [36.99, -114.05, 42.00, -109.04],
-  VT: [42.73, -73.44, 45.02, -71.46], VA: [36.54, -83.68, 39.47, -75.24],
-  WA: [45.54, -124.85, 49.00, -116.92], WV: [37.20, -82.64, 40.64, -77.72],
-  WI: [42.49, -92.89, 47.08, -86.25], WY: [40.99, -111.06, 45.01, -104.05],
-  DC: [38.79, -77.12, 38.99, -76.91],
+// Legacy aliases for compatibility (code references FIPS_TO_STATE)
+export const FIPS_TO_STATE = COUNTRY_CODE_TO_ABBREV;
+export const STATE_TO_FIPS = ABBREV_TO_COUNTRY_CODE;
+
+// Approximate bounding boxes for Middle East countries [south, west, north, east]
+export const COUNTRY_BOUNDS: Record<string, [number, number, number, number]> = {
+  SA: [16.38, 34.50, 32.16, 55.67],  // Saudi Arabia
+  AE: [22.63, 51.50, 26.08, 56.38],  // United Arab Emirates
+  QA: [24.47, 50.75, 26.15, 51.64],  // Qatar
+  KW: [28.52, 46.55, 30.10, 48.43],  // Kuwait
+  BH: [25.79, 50.45, 26.29, 50.82],  // Bahrain
+  OM: [16.65, 52.00, 26.39, 59.84],  // Oman
+  JO: [29.19, 34.96, 33.37, 39.30],  // Jordan
+  LB: [33.06, 35.10, 34.69, 36.62],  // Lebanon
+  SY: [32.31, 35.73, 37.32, 42.38],  // Syria
+  IQ: [29.06, 38.79, 37.38, 48.57],  // Iraq
+  EG: [22.00, 24.70, 31.67, 36.90],  // Egypt
+  LY: [19.50, 9.39, 33.17, 25.15],   // Libya
+  TN: [30.23, 7.52, 37.54, 11.60],   // Tunisia
+  DZ: [18.97, -8.67, 37.09, 11.98],  // Algeria
+  MA: [27.67, -13.17, 35.92, -0.99], // Morocco
+  MR: [14.72, -17.07, 27.30, -4.83], // Mauritania
+  SD: [8.68, 21.84, 22.23, 38.58],   // Sudan
+  YE: [12.11, 42.55, 19.00, 54.53],  // Yemen
+  DJ: [10.94, 41.77, 12.71, 43.42],  // Djibouti
+  KM: [-12.42, 43.23, -11.36, 44.54], // Comoros
+  SO: [-1.66, 40.99, 11.98, 51.41],  // Somalia
+  PS: [31.22, 34.22, 32.55, 35.57],  // Palestine
+  TR: [35.82, 25.67, 42.11, 44.82],  // Turkey
 };
 
-// Full state name lookup (search results, quadrant fallback labels, etc.)
-export const STATE_NAMES: Record<string, string> = {
-  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
-  CO: "Colorado", CT: "Connecticut", DE: "Delaware", DC: "D.C.", FL: "Florida",
-  GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana",
-  IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine",
-  MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota",
-  MS: "Mississippi", MO: "Missouri", MT: "Montana", NE: "Nebraska",
-  NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico",
-  NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio",
-  OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island",
-  SC: "South Carolina", SD: "South Dakota", TN: "Tennessee", TX: "Texas",
-  UT: "Utah", VT: "Vermont", VA: "Virginia", WA: "Washington",
-  WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+// Legacy alias for compatibility
+export const STATE_BOUNDS = COUNTRY_BOUNDS;
+
+// Full country name lookup
+export const COUNTRY_NAMES: Record<string, string> = {
+  SA: "Saudi Arabia",
+  AE: "United Arab Emirates",
+  QA: "Qatar",
+  KW: "Kuwait",
+  BH: "Bahrain",
+  OM: "Oman",
+  JO: "Jordan",
+  LB: "Lebanon",
+  SY: "Syria",
+  IQ: "Iraq",
+  EG: "Egypt",
+  LY: "Libya",
+  TN: "Tunisia",
+  DZ: "Algeria",
+  MA: "Morocco",
+  MR: "Mauritania",
+  SD: "Sudan",
+  YE: "Yemen",
+  DJ: "Djibouti",
+  KM: "Comoros",
+  SO: "Somalia",
+  PS: "Palestine",
+  TR: "Turkey",
 };
 
-/** Neighboring state abbreviations (contiguous US + DC with MD). Used to prioritize main-campus search. */
-export const STATE_NEIGHBORS: Record<string, string[]> = {
-  AL: ["FL", "GA", "MS", "TN"],
-  AK: [],
-  AZ: ["CA", "CO", "NM", "NV", "UT"],
-  AR: ["LA", "MS", "MO", "OK", "TN", "TX"],
-  CA: ["AZ", "NV", "OR"],
-  CO: ["KS", "NE", "NM", "OK", "UT", "WY"],
-  CT: ["MA", "NY", "RI"],
-  DE: ["MD", "NJ", "PA"],
-  DC: ["MD", "VA"],
-  FL: ["AL", "GA"],
-  GA: ["AL", "FL", "NC", "SC", "TN"],
-  HI: [],
-  ID: ["MT", "NV", "OR", "UT", "WA", "WY"],
-  IL: ["IN", "IA", "KY", "MO", "WI"],
-  IN: ["IL", "KY", "MI", "OH"],
-  IA: ["IL", "MN", "MO", "NE", "SD", "WI"],
-  KS: ["CO", "MO", "NE", "OK"],
-  KY: ["IL", "IN", "MO", "OH", "TN", "VA", "WV"],
-  LA: ["AR", "MS", "TX"],
-  ME: ["NH"],
-  MD: ["DE", "PA", "VA", "WV", "DC"],
-  MA: ["CT", "NH", "NY", "RI", "VT"],
-  MI: ["IL", "IN", "MN", "OH", "WI"],
-  MN: ["IA", "MI", "ND", "SD", "WI"],
-  MS: ["AL", "AR", "LA", "TN"],
-  MO: ["AR", "IL", "IA", "KS", "KY", "NE", "OK", "TN"],
-  MT: ["ID", "ND", "SD", "WY"],
-  NE: ["CO", "IA", "KS", "MO", "SD", "WY"],
-  NV: ["AZ", "CA", "ID", "OR", "UT"],
-  NH: ["ME", "MA", "VT"],
-  NJ: ["DE", "NY", "PA"],
-  NM: ["AZ", "CO", "OK", "TX", "UT"],
-  NY: ["CT", "MA", "NJ", "PA", "RI", "VT"],
-  NC: ["GA", "SC", "TN", "VA"],
-  ND: ["MN", "MT", "SD"],
-  OH: ["IN", "KY", "MI", "PA", "WV"],
-  OK: ["AR", "CO", "KS", "MO", "NM", "TX"],
-  OR: ["CA", "ID", "NV", "WA"],
-  PA: ["DE", "MD", "NJ", "NY", "OH", "WV"],
-  RI: ["CT", "MA", "NY"],
-  SC: ["GA", "NC"],
-  SD: ["IA", "MN", "MT", "NE", "ND", "WY"],
-  TN: ["AL", "AR", "GA", "KY", "MS", "MO", "NC", "VA"],
-  TX: ["AR", "LA", "NM", "OK"],
-  UT: ["AZ", "CO", "ID", "NM", "NV", "WY"],
-  VT: ["MA", "NH", "NY"],
-  VA: ["KY", "MD", "NC", "TN", "WV", "DC"],
-  WA: ["ID", "OR"],
-  WV: ["KY", "MD", "OH", "PA", "VA"],
-  WI: ["IA", "IL", "MI", "MN"],
-  WY: ["CO", "ID", "MT", "NE", "SD", "UT"],
+// Legacy alias for compatibility
+export const STATE_NAMES = COUNTRY_NAMES;
+
+/** Neighboring country abbreviations (geographic adjacency). Used to prioritize main-campus search. */
+export const COUNTRY_NEIGHBORS: Record<string, string[]> = {
+  SA: ["AE", "OM", "YE", "JO", "IQ", "KW", "QA", "BH"],
+  AE: ["SA", "OM"],
+  QA: ["SA", "BH"],
+  KW: ["SA", "IQ"],
+  BH: ["SA", "QA"],
+  OM: ["SA", "AE", "YE"],
+  JO: ["SA", "IQ", "SY", "PS"],
+  LB: ["SY", "PS"],
+  SY: ["TR", "IQ", "JO", "LB", "PS"],
+  IQ: ["TR", "SY", "JO", "SA", "KW"],
+  EG: ["LY", "SD", "PS"],
+  LY: ["EG", "TN", "DZ", "SD"],
+  TN: ["LY", "DZ"],
+  DZ: ["TN", "LY", "MA", "MR"],
+  MA: ["DZ", "MR"],
+  MR: ["MA", "DZ"],
+  SD: ["EG", "LY"],
+  YE: ["SA", "OM"],
+  DJ: ["SO"],
+  KM: [],
+  SO: ["DJ"],
+  PS: ["JO", "EG", "LB", "SY"],
+  TR: ["SY", "IQ"],
 };
 
-export const GEO_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
-export const COUNTIES_GEO_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json";
+// Legacy alias for compatibility
+export const STATE_NEIGHBORS = COUNTRY_NEIGHBORS;
 
-// "You are here" pin for selected church in church view (matches "All states" button purple)
+// TopoJSON source for world countries
+export const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+
+// County equivalent not applicable for Middle East - keep undefined
+export const COUNTIES_GEO_URL = "";
+
+// "You are here" pin for selected church in church view (matches "All countries" button purple)
 export const ACTIVE_PIN_FILL = "#6B21A8";
 
-// Church count tiers for state shading in national view
-export const STATE_COUNT_TIERS = [
+// Church count tiers for country shading in regional view
+export const COUNTRY_COUNT_TIERS = [
   { label: "Not yet explored", min: 0, max: 0, color: "#E8D5F5" },
-  { label: "< 500", min: 1, max: 499, color: "#C9A0DC" },
-  { label: "500-1,500", min: 500, max: 1499, color: "#B07CD0" },
-  { label: "1,500-3,000", min: 1500, max: 2999, color: "#9B59C4" },
-  { label: "3,000-5,000", min: 3000, max: 4999, color: "#8338B8" },
-  { label: "5,000-10,000", min: 5000, max: 9999, color: "#6B21A8" },
-  { label: "10,000+", min: 10000, max: Infinity, color: "#4C1D95" },
+  { label: "< 100", min: 1, max: 99, color: "#C9A0DC" },
+  { label: "100-500", min: 100, max: 499, color: "#B07CD0" },
+  { label: "500-1,000", min: 500, max: 999, color: "#9B59C4" },
+  { label: "1,000-2,000", min: 1000, max: 1999, color: "#8338B8" },
+  { label: "2,000-5,000", min: 2000, max: 4999, color: "#6B21A8" },
+  { label: "5,000+", min: 5000, max: Infinity, color: "#4C1D95" },
 ];
 
-// County choropleth: white to light purple (matching surrounding states #EDE4F3 when in state view)
+// Legacy alias for compatibility
+export const STATE_COUNT_TIERS = COUNTRY_COUNT_TIERS;
+
+// County choropleth not used for Middle East
 export const COUNTY_PER_CAPITA_COLORS = [
   "#FFFFFF",
   "#F8F4FC",
@@ -171,9 +184,9 @@ export const COUNTY_PER_CAPITA_COLORS = [
   "#EDE4F3",
 ];
 
-// Filter churches to state bounding box (handles stale cached data that wasn't bbox-filtered)
-export function filterToStateBounds(churches: { lat: number; lng: number }[], stateAbbrev: string) {
-  const bounds = STATE_BOUNDS[stateAbbrev.toUpperCase()];
+// Filter churches to country bounding box (handles stale cached data that wasn't bbox-filtered)
+export function filterToCountryBounds(churches: { lat: number; lng: number }[], countryAbbrev: string) {
+  const bounds = COUNTRY_BOUNDS[countryAbbrev.toUpperCase()];
   if (!bounds) return churches;
   const [south, west, north, east] = bounds;
   const margin = 0.01;
@@ -186,10 +199,16 @@ export function filterToStateBounds(churches: { lat: number; lng: number }[], st
   );
 }
 
-export function getStateTier(count: number) {
-  if (count <= 0) return STATE_COUNT_TIERS[0];
-  return STATE_COUNT_TIERS.find((t) => count >= t.min && count <= t.max) || STATE_COUNT_TIERS[STATE_COUNT_TIERS.length - 1];
+// Legacy alias for compatibility
+export const filterToStateBounds = filterToCountryBounds;
+
+export function getCountryTier(count: number) {
+  if (count <= 0) return COUNTRY_COUNT_TIERS[0];
+  return COUNTRY_COUNT_TIERS.find((t) => count >= t.min && count <= t.max) || COUNTRY_COUNT_TIERS[COUNTRY_COUNT_TIERS.length - 1];
 }
+
+// Legacy alias for compatibility
+export const getStateTier = getCountryTier;
 
 /** Returns choropleth color for county by per-capita rank (0 = lowest, 1 = highest). */
 export function getCountyPerCapitaColor(perCapita: number, sortedByPerCapita: { perCapita: number }[]): string {
@@ -204,22 +223,16 @@ export function getCountyPerCapitaColor(perCapita: number, sortedByPerCapita: { 
   return COUNTY_PER_CAPITA_COLORS[tier];
 }
 
-// Compute a zoom level that makes the state fill more of the viewport.
-// Uses the bounding-box diagonal relative to a reference (Texas ≈ diagonal 17°).
-// Alaska & Hawaii are special-cased because AlbersUSA repositions them.
-const STATE_ZOOM_OVERRIDES: Record<string, number> = {
-  AK: 3,
-  HI: 5.3,
-};
-const REFERENCE_DIAGONAL = 17; // approx Texas bbox diagonal in degrees
-const REFERENCE_ZOOM = 3.7;   // desired zoom for Texas-sized states (tuned: one zoom-out from 5.5)
-const MIN_STATE_ZOOM = 3;
-const MAX_STATE_ZOOM = 10.5;
+// Compute a zoom level that makes the country fill more of the viewport.
+// Uses the bounding-box diagonal relative to a reference.
+const REFERENCE_DIAGONAL = 15; // approx Saudi Arabia bbox diagonal in degrees
+const REFERENCE_ZOOM = 4;      // desired zoom for Saudi-sized countries
+const MIN_COUNTRY_ZOOM = 3;
+const MAX_COUNTRY_ZOOM = 12;
 
-export function getStateZoom(abbrev: string): number {
+export function getCountryZoom(abbrev: string): number {
   const upper = abbrev.toUpperCase();
-  if (STATE_ZOOM_OVERRIDES[upper] != null) return STATE_ZOOM_OVERRIDES[upper];
-  const bounds = STATE_BOUNDS[upper];
+  const bounds = COUNTRY_BOUNDS[upper];
   if (!bounds) return REFERENCE_ZOOM;
   const [south, west, north, east] = bounds;
   const latSpan = north - south;
@@ -227,5 +240,15 @@ export function getStateZoom(abbrev: string): number {
   const diagonal = Math.sqrt(latSpan * latSpan + lngSpan * lngSpan);
   if (diagonal <= 0) return REFERENCE_ZOOM;
   const zoom = REFERENCE_ZOOM * (REFERENCE_DIAGONAL / diagonal);
-  return Math.min(MAX_STATE_ZOOM, Math.max(MIN_STATE_ZOOM, Math.round(zoom * 10) / 10));
+  return Math.min(MAX_COUNTRY_ZOOM, Math.max(MIN_COUNTRY_ZOOM, Math.round(zoom * 10) / 10));
 }
+
+// Legacy alias for compatibility
+export const getStateZoom = getCountryZoom;
+
+// Middle East region: list of all target country codes
+export const MIDDLE_EAST_COUNTRIES = [
+  "SA", "AE", "QA", "KW", "BH", "OM", "JO", "LB", "SY", "IQ",
+  "EG", "LY", "TN", "DZ", "MA", "MR", "SD", "YE", "DJ", "KM",
+  "SO", "PS", "TR"
+];

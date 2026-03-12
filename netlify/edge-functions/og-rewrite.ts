@@ -1,6 +1,6 @@
 /**
  * Netlify Edge Function: rewrite HTML meta tags for social crawlers
- * so /state/:abbrev and /state/:abbrev/:shortId get correct og:image, og:title, og:url.
+ * so /country/:abbrev and /country/:abbrev/:shortId get correct og:image, og:title, og:url.
  *
  * Required Netlify env vars (for bot requests):
  *   SUPABASE_FUNCTIONS_BASE_URL - e.g. https://PROJECT.supabase.co/functions/v1/make-server-283d8046
@@ -28,29 +28,42 @@ const BOT_UA_PATTERNS = [
   "ia_archiver",
 ];
 
-const STATE_NAMES: Record<string, string> = {
-  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
-  CO: "Colorado", CT: "Connecticut", DE: "Delaware", FL: "Florida", GA: "Georgia",
-  HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa", KS: "Kansas",
-  KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland", MA: "Massachusetts",
-  MI: "Michigan", MN: "Minnesota", MS: "Mississippi", MO: "Missouri", MT: "Montana",
-  NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico",
-  NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma",
-  OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota",
-  TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia", WA: "Washington",
-  WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming", DC: "District of Columbia",
+const COUNTRY_NAMES: Record<string, string> = {
+  SA: "Saudi Arabia",
+  AE: "United Arab Emirates",
+  QA: "Qatar",
+  KW: "Kuwait",
+  BH: "Bahrain",
+  OM: "Oman",
+  JO: "Jordan",
+  LB: "Lebanon",
+  SY: "Syria",
+  IQ: "Iraq",
+  EG: "Egypt",
+  LY: "Libya",
+  TN: "Tunisia",
+  DZ: "Algeria",
+  MA: "Morocco",
+  MR: "Mauritania",
+  SD: "Sudan",
+  YE: "Yemen",
+  DJ: "Djibouti",
+  KM: "Comoros",
+  SO: "Somalia",
+  PS: "Palestine",
+  TR: "Turkey",
 };
 
 const SITE_URL = "https://heresmychurch.com";
-const DEFAULT_DESCRIPTION = "An interactive map of Christian churches in the U.S. Find your church or find a new church. 100% free and crowd-sourced.";
+const DEFAULT_DESCRIPTION = "An interactive map of Christian churches in the Middle East. Find your church or find a new church. 100% free and crowd-sourced.";
 
 function isBot(userAgent: string): boolean {
   const ua = userAgent || "";
   return BOT_UA_PATTERNS.some((p) => ua.includes(p));
 }
 
-function getStateName(abbrev: string): string {
-  return STATE_NAMES[abbrev.toUpperCase()] ?? abbrev;
+function getCountryName(abbrev: string): string {
+  return COUNTRY_NAMES[abbrev.toUpperCase()] ?? abbrev;
 }
 
 interface OgMeta {
@@ -68,7 +81,7 @@ export default async function handler(request: Request, context: Context): Promi
 
   const url = new URL(request.url);
   const path = url.pathname;
-  const pathParts = path.split("/").filter(Boolean); // ["state", "CA"] or ["state", "CA", "16692500"]
+  const pathParts = path.split("/").filter(Boolean); // ["country", "LB"] or ["country", "LB", "16692500"]
 
   const apiBase = Deno.env.get("SUPABASE_FUNCTIONS_BASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
@@ -77,27 +90,28 @@ export default async function handler(request: Request, context: Context): Promi
   }
 
   let meta: OgMeta = {
-    title: "Here's My Church",
+    title: "Here's My Church - Middle East",
     description: DEFAULT_DESCRIPTION,
     image: `${SITE_URL}/og-image.png`,
     url: SITE_URL,
   };
 
-  if (pathParts[0] === "state" && pathParts[1]) {
-    const stateAbbrev = pathParts[1].toUpperCase();
+  // Support both /country/ and legacy /state/ URLs
+  if ((pathParts[0] === "country" || pathParts[0] === "state") && pathParts[1]) {
+    const countryAbbrev = pathParts[1].toUpperCase();
     const shortId = pathParts[2];
 
     if (!shortId) {
-      const stateName = getStateName(stateAbbrev);
+      const countryName = getCountryName(countryAbbrev);
       meta = {
-        title: `Churches in ${stateName}`,
-        description: `Find Christian churches in ${stateName}. ${DEFAULT_DESCRIPTION}`,
-        image: `${apiBase}/og-image?type=state&state=${encodeURIComponent(stateAbbrev)}`,
-        url: `${SITE_URL}/state/${stateAbbrev}`,
+        title: `Churches in ${countryName}`,
+        description: `Find Christian churches in ${countryName}. ${DEFAULT_DESCRIPTION}`,
+        image: `${apiBase}/og-image?type=state&state=${encodeURIComponent(countryAbbrev)}`,
+        url: `${SITE_URL}/country/${countryAbbrev}`,
       };
     } else {
       try {
-        const res = await fetch(`${apiBase}/churches/${stateAbbrev}`, {
+        const res = await fetch(`${apiBase}/churches/${countryAbbrev}`, {
           headers: { Authorization: `Bearer ${anonKey}`, "Content-Type": "application/json" },
         });
         if (res.ok) {
@@ -111,15 +125,15 @@ export default async function handler(request: Request, context: Context): Promi
             const ogParams = new URLSearchParams({
               type: "church",
               name: name,
-              state: stateAbbrev,
+              state: countryAbbrev,
             });
             if (city) ogParams.set("city", city);
             if (denom) ogParams.set("denomination", denom);
             meta = {
               title: name,
-              description: [city, stateAbbrev].filter(Boolean).join(", ") + (denom ? ` · ${denom}` : ""),
+              description: [city, countryAbbrev].filter(Boolean).join(", ") + (denom ? ` · ${denom}` : ""),
               image: `${apiBase}/og-image?${ogParams.toString()}`,
-              url: `${SITE_URL}/state/${stateAbbrev}/${shortId}`,
+              url: `${SITE_URL}/country/${countryAbbrev}/${shortId}`,
             };
           }
         }

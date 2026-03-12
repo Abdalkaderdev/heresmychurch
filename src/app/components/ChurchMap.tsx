@@ -477,7 +477,7 @@ function MapArea({
 }) {
   return (
     <div className="flex-1 relative" style={{ backgroundColor: "#F5F0E8" }}>
-      {/* Top row: header pill only (secondary controls moved to bottom-left cluster); z-40 so summary stacks above All states + MapControls (z-30). pointer-events-none so click-outside hits the catcher. */}
+      {/* Top row: header pill only (secondary controls moved to bottom-left cluster); z-40 so summary stacks above All countries + MapControls (z-30). pointer-events-none so click-outside hits the catcher. */}
       {!isLoadingVisible && d.states.length > 0 && (
       <div className="absolute top-4 left-4 right-4 z-40 flex flex-row items-center justify-center animate-in fade-in duration-300 pointer-events-none">
         <div className="flex flex-col items-center justify-center min-w-0 overflow-hidden max-w-full pointer-events-auto" ref={d.summaryRef}>
@@ -643,13 +643,13 @@ function MapArea({
           {(d.focusedState || d.selectedChurch) && (
             <button
               onClick={d.handleResetView}
-              title="All states"
-              aria-label="All states"
+              title="All countries"
+              aria-label="All countries"
               className="flex items-center gap-1.5 h-8 pl-2 pr-2.5 rounded-full shadow-md transition-colors hover:opacity-90 text-white text-xs font-medium"
               style={{ backgroundColor: "rgba(107, 33, 168, 0.9)" }}
             >
               <ArrowLeft size={14} color="#fff" />
-              All states
+              All countries
             </button>
           )}
           {!d.selectedChurch && (

@@ -14,11 +14,9 @@ import { ChurchDots } from "./ChurchDots";
 import type { Church, StateInfo } from "./church-data";
 import {
   GEO_URL,
-  COUNTIES_GEO_URL,
-  FIPS_TO_STATE,
-  STATE_TO_FIPS,
+  COUNTRY_CODE_TO_ABBREV,
   getStateTier,
-  getCountyPerCapitaColor,
+  MIDDLE_EAST_COUNTRIES,
 } from "./map-constants";
 
 export type CountyStats = {
@@ -79,9 +77,12 @@ export const MapCanvas = memo(function MapCanvas({
       onTouchStart={markTouch}
     >
     <ComposableMap
-      projection="geoAlbersUsa"
+      projection="geoMercator"
       style={{ width: "100%", height: "100%" }}
-      projectionConfig={{ scale: 1000 }}
+      projectionConfig={{
+        center: [40, 28],  // Middle East center (lng, lat)
+        scale: 600,
+      }}
     >
       <ZoomableGroup
         center={center}
@@ -113,15 +114,7 @@ export const MapCanvas = memo(function MapCanvas({
           onStateHover={onStateHover}
         />
 
-        {focusedState && (
-          <CountyGeographies
-            focusedState={focusedState}
-            countyStats={countyStats}
-            hoveredCounty={hoveredCounty}
-            onCountyHover={onCountyHover}
-            disableHover={isTouchDevice}
-          />
-        )}
+        {/* County boundaries not applicable for Middle East */}
 
         {filteredChurches.length > 0 && (
           <ChurchDots
@@ -139,7 +132,7 @@ export const MapCanvas = memo(function MapCanvas({
   );
 });
 
-/* ── State boundaries ── */
+/* ── Country boundaries ── */
 const StateGeographies = memo(function StateGeographies({
   focusedState,
   hoveredState,
@@ -158,94 +151,49 @@ const StateGeographies = memo(function StateGeographies({
   return (
     <Geographies geography={GEO_URL}>
       {({ geographies }: { geographies: any[] }) =>
-        (geographies || []).map((geo) => {
-          const fipsId = geo.id;
-          const stateAbbrev = FIPS_TO_STATE[fipsId];
-          const stateInfo = states.find((s) => s.abbrev === stateAbbrev);
-          const isFocused = focusedState === stateAbbrev;
-          const isHovered = hoveredState === stateAbbrev;
-
-          const churchCount = stateInfo?.churchCount || 0;
-          const tier = getStateTier(churchCount);
-          let fill = tier.color;
-          if (isFocused) fill = "#C9A0DC";
-          else if (isHovered && !focusedState) fill = "#D4B8E8";
-          else if (focusedState && !isFocused) fill = "#EDE4F3";
-
-          return (
-            <Geography
-              key={geo.rsmKey}
-              geography={geo}
-              fill={fill}
-              stroke={isFocused ? "#6B21A8" : "#C9A0DC"}
-              strokeWidth={isFocused ? 1.5 : 0.5}
-              onClick={(e: React.MouseEvent) => {
-                if (stateAbbrev && !focusedState) {
-                  onStateClick(stateAbbrev);
-                } else if (focusedState && isFocused) {
-                  e.stopPropagation();
-                } else if (focusedState && !isFocused) {
-                  onResetView();
-                }
-              }}
-              onMouseEnter={() => onStateHover(stateAbbrev || null)}
-              onMouseLeave={() => onStateHover(null)}
-              style={{
-                default: { outline: "none", cursor: focusedState && isFocused ? "default" : "pointer" },
-                hover: { outline: "none", cursor: focusedState && isFocused ? "default" : "pointer" },
-                pressed: { outline: "none", cursor: focusedState && isFocused ? "default" : "pointer" },
-              }}
-            />
-          );
-        })
-      }
-    </Geographies>
-  );
-});
-
-/* ── County boundaries (choropleth by churches per capita) ── */
-const CountyGeographies = memo(function CountyGeographies({
-  focusedState,
-  countyStats,
-  hoveredCounty,
-  onCountyHover,
-  disableHover,
-}: {
-  focusedState: string;
-  countyStats: CountyStats | null;
-  hoveredCounty: string | null;
-  onCountyHover: (fips: string | null) => void;
-  disableHover?: boolean;
-}) {
-  const stateFips = STATE_TO_FIPS[focusedState];
-  if (!stateFips) return null;
-
-  return (
-    <Geographies geography={COUNTIES_GEO_URL}>
-      {({ geographies }: { geographies: any[] }) =>
         (geographies || [])
-          .filter((geo) => String(geo.id).padStart(5, "0").substring(0, 2) === stateFips)
+          .filter((geo) => {
+            // Only render Middle East countries
+            const numericCode = String(geo.id);
+            const countryAbbrev = COUNTRY_CODE_TO_ABBREV[numericCode];
+            return countryAbbrev && MIDDLE_EAST_COUNTRIES.includes(countryAbbrev);
+          })
           .map((geo) => {
-            const fips = String(geo.id).padStart(5, "0");
-            const data = countyStats?.byFips[fips];
-            const fill = data
-              ? getCountyPerCapitaColor(data.perCapita, countyStats?.sortedByPerCapita ?? [])
-              : "rgba(255, 255, 255, 0.8)";
-            const isHovered = !disableHover && hoveredCounty === fips;
+            const numericCode = String(geo.id);
+            const countryAbbrev = COUNTRY_CODE_TO_ABBREV[numericCode];
+            const countryInfo = states.find((s) => s.abbrev === countryAbbrev);
+            const isFocused = focusedState === countryAbbrev;
+            const isHovered = hoveredState === countryAbbrev;
+
+            const churchCount = countryInfo?.churchCount || 0;
+            const tier = getStateTier(churchCount);
+            let fill = tier.color;
+            if (isFocused) fill = "#C9A0DC";
+            else if (isHovered && !focusedState) fill = "#D4B8E8";
+            else if (focusedState && !isFocused) fill = "#EDE4F3";
+
             return (
               <Geography
                 key={geo.rsmKey}
                 geography={geo}
-                fill={isHovered ? "#D4B8E8" : fill}
-                stroke={isHovered ? "rgba(107, 33, 168, 0.6)" : "rgba(107, 33, 168, 0.25)"}
-                strokeWidth={isHovered ? 0.8 : 0.4}
-                pointerEvents={disableHover ? "none" : "auto"}
-                onMouseEnter={disableHover ? undefined : () => onCountyHover(fips)}
-                onMouseLeave={disableHover ? undefined : () => onCountyHover(null)}
+                fill={fill}
+                stroke={isFocused ? "#6B21A8" : "#C9A0DC"}
+                strokeWidth={isFocused ? 1.5 : 0.5}
+                onClick={(e: React.MouseEvent) => {
+                  if (countryAbbrev && !focusedState) {
+                    onStateClick(countryAbbrev);
+                  } else if (focusedState && isFocused) {
+                    e.stopPropagation();
+                  } else if (focusedState && !isFocused) {
+                    onResetView();
+                  }
+                }}
+                onMouseEnter={() => onStateHover(countryAbbrev || null)}
+                onMouseLeave={() => onStateHover(null)}
                 style={{
-                  default: { outline: "none", cursor: "default" },
-                  hover: { outline: "none", cursor: "default" },
-                  pressed: { outline: "none", cursor: "default" },
+                  default: { outline: "none", cursor: focusedState && isFocused ? "default" : "pointer" },
+                  hover: { outline: "none", cursor: focusedState && isFocused ? "default" : "pointer" },
+                  pressed: { outline: "none", cursor: focusedState && isFocused ? "default" : "pointer" },
                 }}
               />
             );
@@ -254,3 +202,5 @@ const CountyGeographies = memo(function CountyGeographies({
     </Geographies>
   );
 });
+
+/* County boundaries not applicable for Middle East */

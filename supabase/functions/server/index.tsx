@@ -5,60 +5,99 @@ import { generateOgImage } from "./og-image.tsx";
 import * as regrid from "./regrid.ts";
 import { POP } from "./state-populations.ts";
 
-// ── State data ──
-interface SI{a:string;n:string;la:number;lo:number;}
-const S:[string,string,number,number][]=[["AL","Alabama",32.81,-86.79],["AK","Alaska",61.37,-152.4],["AZ","Arizona",33.73,-111.43],["AR","Arkansas",34.97,-92.37],["CA","California",36.12,-119.68],["CO","Colorado",39.06,-105.31],["CT","Connecticut",41.6,-72.76],["DE","Delaware",39.32,-75.51],["FL","Florida",27.77,-81.69],["GA","Georgia",33.04,-83.64],["HI","Hawaii",21.09,-157.5],["ID","Idaho",44.24,-114.48],["IL","Illinois",40.35,-88.99],["IN","Indiana",39.85,-86.26],["IA","Iowa",42.01,-93.21],["KS","Kansas",38.53,-96.73],["KY","Kentucky",37.67,-84.67],["LA","Louisiana",31.17,-91.87],["ME","Maine",44.69,-69.38],["MD","Maryland",39.06,-76.8],["MA","Massachusetts",42.23,-71.53],["MI","Michigan",43.33,-84.54],["MN","Minnesota",45.69,-93.9],["MS","Mississippi",32.74,-89.68],["MO","Missouri",38.46,-92.29],["MT","Montana",46.92,-110.45],["NE","Nebraska",41.13,-98.27],["NV","Nevada",38.31,-117.06],["NH","New Hampshire",43.45,-71.56],["NJ","New Jersey",40.3,-74.52],["NM","New Mexico",34.84,-106.25],["NY","New York",42.17,-74.95],["NC","North Carolina",35.63,-79.81],["ND","North Dakota",47.53,-99.78],["OH","Ohio",40.39,-82.76],["OK","Oklahoma",35.57,-96.93],["OR","Oregon",44.57,-122.07],["PA","Pennsylvania",40.59,-77.21],["RI","Rhode Island",41.68,-71.51],["SC","South Carolina",33.86,-80.95],["SD","South Dakota",44.3,-99.44],["TN","Tennessee",35.75,-86.69],["TX","Texas",31.05,-97.56],["UT","Utah",40.15,-111.86],["VT","Vermont",44.05,-72.71],["VA","Virginia",37.77,-78.17],["WA","Washington",47.4,-121.49],["WV","West Virginia",38.49,-80.95],["WI","Wisconsin",44.27,-89.62],["WY","Wyoming",42.76,-107.3]];
-const US:SI[]=S.map(([a,n,la,lo])=>({a,n,la,lo}));
-function gS(a:string):SI|undefined{return US.find(s=>s.a===a.toUpperCase());}
+// ── Country data (Middle East / Arab League + Turkey) ──
+interface CI{a:string;n:string;la:number;lo:number;}
+const C:[string,string,number,number][]=[
+  ["SA","Saudi Arabia",24.71,46.68],
+  ["AE","United Arab Emirates",24.47,54.37],
+  ["QA","Qatar",25.30,51.18],
+  ["KW","Kuwait",29.38,47.99],
+  ["BH","Bahrain",26.03,50.55],
+  ["OM","Oman",21.47,55.98],
+  ["JO","Jordan",31.24,36.51],
+  ["LB","Lebanon",33.85,35.86],
+  ["SY","Syria",34.80,39.00],
+  ["IQ","Iraq",33.22,43.68],
+  ["EG","Egypt",26.82,30.80],
+  ["LY","Libya",26.34,17.23],
+  ["TN","Tunisia",33.89,9.54],
+  ["DZ","Algeria",28.03,1.66],
+  ["MA","Morocco",31.79,-7.09],
+  ["MR","Mauritania",21.01,-10.94],
+  ["SD","Sudan",15.50,32.56],
+  ["YE","Yemen",15.55,48.52],
+  ["DJ","Djibouti",11.59,42.59],
+  ["KM","Comoros",-11.88,43.87],
+  ["SO","Somalia",5.15,46.20],
+  ["PS","Palestine",31.95,35.23],
+  ["TR","Turkey",38.96,35.24],
+];
+const ME:CI[]=C.map(([a,n,la,lo])=>({a,n,la,lo}));
+function gS(a:string):CI|undefined{return ME.find(s=>s.a===a.toUpperCase());}
 
 // ── Geographic data ──
-const B:Record<string,[number,number,number,number]>={AL:[30.22,-88.47,35.01,-84.89],AK:[51.21,-179.15,71.39,-129.98],AZ:[31.33,-114.81,37,-109.04],AR:[33,-94.62,36.5,-89.64],CA:[32.53,-124.41,42.01,-114.13],CO:[36.99,-109.06,41,-102.04],CT:[40.95,-73.73,42.05,-71.79],DE:[38.45,-75.79,39.84,-75.05],FL:[24.4,-87.63,31,-79.97],GA:[30.36,-85.61,35,-80.84],HI:[18.91,-160.24,22.24,-154.81],ID:[42,-117.24,49,-111.04],IL:[36.97,-91.51,42.51,-87.02],IN:[37.77,-88.1,41.76,-84.78],IA:[40.38,-96.64,43.5,-90.14],KS:[36.99,-102.05,40,-94.59],KY:[36.5,-89.57,39.15,-81.96],LA:[28.93,-94.04,33.02,-88.82],ME:[42.98,-71.08,47.46,-66.95],MD:[37.91,-79.49,39.72,-75.05],MA:[41.24,-73.5,42.89,-69.93],MI:[41.7,-90.42,48.31,-82.12],MN:[43.5,-97.24,49.38,-89.49],MS:[30.17,-91.66,34.99,-88.1],MO:[35.99,-95.77,40.61,-89.1],MT:[44.36,-116.05,49,-104.04],NE:[39.99,-104.05,43,-95.31],NV:[35,-120.01,42,-114.04],NH:[42.7,-72.56,45.31,-70.7],NJ:[38.93,-75.56,41.36,-73.89],NM:[31.33,-109.05,37,-103],NY:[40.5,-79.76,45.02,-71.86],NC:[33.84,-84.32,36.59,-75.46],ND:[45.94,-104.05,49,-96.55],OH:[38.4,-84.82,42.33,-80.52],OK:[33.62,-103,37,-94.43],OR:[41.99,-124.57,46.29,-116.46],PA:[39.72,-80.52,42.27,-74.69],RI:[41.15,-71.86,42.02,-71.12],SC:[32.03,-83.35,35.22,-78.54],SD:[42.48,-104.06,45.95,-96.44],TN:[34.98,-90.31,36.68,-81.65],TX:[25.84,-106.65,36.5,-93.51],UT:[36.99,-114.05,42,-109.04],VT:[42.73,-73.44,45.02,-71.46],VA:[36.54,-83.68,39.47,-75.24],WA:[45.54,-124.85,49,-116.92],WV:[37.2,-82.64,40.64,-77.72],WI:[42.49,-92.89,47.08,-86.25],WY:[40.99,-111.06,45.01,-104.05],DC:[38.79,-77.12,38.99,-76.91]};
-// States that use 4-quadrant Overpass queries to avoid single-query 2000 truncation
-const BIG=new Set(["TX","CA","FL","NY","PA","OH","IL","GA","NC","MI","TN","VA","AL","MO","IN","SC","KY","LA","WI","MN","MS","AR","OK","IA","KS","NJ","AZ","WA","OR","MA","NV","NM","UT","CT","MD","CO"]);
+const B:Record<string,[number,number,number,number]>={
+  SA:[16.38,34.50,32.16,55.67],AE:[22.63,51.50,26.08,56.38],QA:[24.47,50.75,26.15,51.64],
+  KW:[28.52,46.55,30.10,48.43],BH:[25.79,50.45,26.29,50.82],OM:[16.65,52.00,26.39,59.84],
+  JO:[29.19,34.96,33.37,39.30],LB:[33.06,35.10,34.69,36.62],SY:[32.31,35.73,37.32,42.38],
+  IQ:[29.06,38.79,37.38,48.57],EG:[22.00,24.70,31.67,36.90],LY:[19.50,9.39,33.17,25.15],
+  TN:[30.23,7.52,37.54,11.60],DZ:[18.97,-8.67,37.09,11.98],MA:[27.67,-13.17,35.92,-0.99],
+  MR:[14.72,-17.07,27.30,-4.83],SD:[8.68,21.84,22.23,38.58],YE:[12.11,42.55,19.00,54.53],
+  DJ:[10.94,41.77,12.71,43.42],KM:[-12.42,43.23,-11.36,44.54],SO:[-1.66,40.99,11.98,51.41],
+  PS:[31.22,34.22,32.55,35.57],TR:[35.82,25.67,42.11,44.82],
+};
+// Large countries that use 4-quadrant Overpass queries to avoid single-query 2000 truncation
+const BIG=new Set(["EG","SA","DZ","SD","TR","LY","IQ","MA"]);
 
 // ── Denomination matching (lazy regex compilation) ──
+// Middle East Christian traditions: Orthodox, Eastern Catholic, Latin Catholic, Protestant, Evangelical
 type DR=[string,string[]?,string?,string[]?];
 const RULES:DR[]=[
-["Catholic",["catholic","roman_catholic"]],
-["Catholic",,"\\b(parroquia|catedral|nuestra|virgen|sagrado|iglesia cat)\\b",["baptist","pentecostal","lutheran"]],
-["Catholic",,"\\b(parish|basilica|sacred heart|immaculate|our lady|blessed sacrament|holy (family|cross|spirit|trinity|rosary|name|redeemer))\\b",["lutheran","episcopal","orthodox","baptist","methodist","presbyterian","anglican"]],
-["Catholic",,"\\bst\\. (patrick|joseph|mary|anne|anthony|michael|peter|paul|john|james|francis|theresa|catherine|augustine|thomas|elizabeth|jude)\\b",["lutheran","episcopal","orthodox","baptist","methodist","presbyterian","anglican","latter"]],
-["Catholic",,"\\b(maronite|melkite|chaldean|byzantine catholic|latin mass|tridentine)\\b"],
-["Baptist",["baptist","sbc","southern baptist"]],
-["Methodist",["methodist","united_methodist","african methodist","wesleyan"]],
-["Methodist",,"\\b(ame|umc)\\b"],
-["Lutheran",["lutheran","lcms","elca","wels","missouri synod"]],
-["Presbyterian",["presbyterian","pcusa"]],
-["Episcopal",["episcopal","anglican","acna"]],
-["Pentecostal",["pentecostal","foursquare"]],
-["Pentecostal",["apostolic"],,"latter"],
-["Pentecostal",,"\\b(church of god of prophecy|full gospel|holiness church|iglesia pentecostal|deliverance (church|temple|center)|united pentecostal)\\b"],
-["Assemblies of God",["assemblies of god","assembly of god","assemblies_of_god","assembly_of_god"]],
-["Church of Christ",,"\\bchurch(es)? of christ\\b",["united church of christ","latter"]],
-["Congregational",["united church of christ","congregational"]],
-["Church of God",["church of god"],,"latter,prophecy".split(",")],
-["Church of God",["cogic","church of god in christ"]],
-["Latter-day Saints",["latter","mormon","lds","church of jesus christ"]],
-["Seventh-day Adventist",["seventh","adventist","sda"]],
-["Jehovah's Witnesses",["jehovah","kingdom hall"]],
+// Orthodox churches (largest Christian presence in Middle East)
+["Coptic Orthodox",["coptic orthodox","coptic_orthodox"]],
+["Coptic Orthodox",,"\\b(coptic|قبطي)\\b",["catholic"]],
+["Greek Orthodox",["greek orthodox","greek_orthodox","rum orthodox"]],
+["Greek Orthodox",,"\\brum\\b",["catholic"]],
+["Armenian Apostolic",["armenian apostolic","armenian_apostolic","armenian orthodox"]],
+["Armenian Apostolic",,"\\barmenian\\b",["catholic"]],
+["Syriac Orthodox",["syriac orthodox","syrian orthodox","syriac_orthodox"]],
+["Antiochian Orthodox",["antiochian","antioch orthodox"]],
+["Ethiopian Orthodox",["ethiopian orthodox","ethiopian_orthodox"]],
+["Eritrean Orthodox",["eritrean orthodox","eritrean_orthodox"]],
 ["Orthodox",["orthodox"]],
-["Non-denominational",["nondenominational","non-denominational","non_denominational","calvary chapel","vineyard"]],
-["Non-denominational",,"\\b(bible church|bible fellowship|worship center|faith (center|church)|grace (church|bible)|harvest church|city church|rock church|cornerstone|new life church|victory church|journey church|mosaic church|bridge church|summit church)\\b"],
-["Non-denominational",,"\\b(iglesia cristiana|centro cristiano|ministerio cristiano|casa de (oraci|dios|fe))\\b",["adventist","baptist","catolica"]],
-["Non-denominational",,"\\bcommunity church\\b",["methodist","lutheran","baptist","presbyterian","reformed"]],
-["Evangelical",["evangelical","efca","evangelical free"],,"lutheran"],
-["Nazarene",["nazarene"]],
-["Quaker",["quaker","friends meeting"]],
-["Mennonite",["mennonite","church of the brethren"]],
-["Amish",["amish"]],
-["Reformed",["reformed","christian reformed"],,"latter"],
-["Unitarian",["unitarian","universalist"]],
-["Christian Science",["christian science","scientist"]],
+// Eastern Catholic (in communion with Rome)
+["Maronite Catholic",["maronite"]],
+["Melkite Catholic",["melkite","melkite greek catholic"]],
+["Chaldean Catholic",["chaldean"]],
+["Coptic Catholic",["coptic catholic"]],
+["Armenian Catholic",["armenian catholic"]],
+["Syriac Catholic",["syriac catholic","syrian catholic"]],
+// Latin Catholic
+["Catholic",["catholic","roman_catholic"]],
+["Catholic",,"\\b(parish|basilica|sacred heart|immaculate|our lady|blessed sacrament|holy (family|cross|spirit|trinity|rosary|name|redeemer))\\b",["orthodox","maronite","melkite","chaldean","coptic","armenian","syriac"]],
+["Catholic",,"\\bst\\. (patrick|joseph|mary|anne|anthony|michael|peter|paul|john|james|francis|theresa|catherine|augustine|thomas|elizabeth|jude)\\b",["orthodox","lutheran","episcopal","baptist","methodist","presbyterian","anglican"]],
+// Assyrian Church of the East (distinct from Catholic and Orthodox)
+["Assyrian Church of the East",["assyrian church","church of the east"]],
+["Assyrian Church of the East",,"\\bassyrian\\b",["catholic"]],
+// Protestant mainline
+["Anglican",["anglican","episcopal","church of england"]],
+["Lutheran",["lutheran"]],
+["Presbyterian",["presbyterian"]],
+["Methodist",["methodist","wesleyan"]],
+["Baptist",["baptist"]],
+// Evangelical/Pentecostal
+["Assemblies of God",["assemblies of god","assembly of god","assemblies_of_god","assembly_of_god"]],
+["Pentecostal",["pentecostal","foursquare","full gospel"]],
+["Evangelical",["evangelical","bible church"]],
+// Seventh-day Adventist
+["Seventh-day Adventist",["seventh","adventist","sda"]],
+// Expat/International churches (common in Gulf states)
+["Non-denominational",["nondenominational","non-denominational","non_denominational","community church","international church","fellowship"]],
+["Non-denominational",,"\\b(international|expat|fellowship|worship center|faith church|grace church|bible fellowship|international christian)\\b"],
+// Salvation Army
 ["Salvation Army",["salvation army"]],
-["Disciples of Christ",["disciples of christ"]],
-["Covenant",["covenant"],,"ark of,old covenant"],
-["Non-denominational",,"\\b(iglesia|templo|ministerio)\\b",["catholic","catolica"]],
-["Non-denominational",,"\\bchapel\\b",["catholic","methodist","lutheran","baptist","episcopal","presbyterian","orthodox"]],
+// Language-specific patterns (Arabic church names)
+["Non-denominational",,"\\b(كنيسة|كنيست)\\b"],  // Arabic for "church"
 ];
 
 // Lazy-compile regexes on first use to reduce cold-start time
@@ -87,10 +126,22 @@ function normD(tags:Record<string,string>):string{
   return"Non-denominational";
 }
 
-const DMED:Record<string,number>={"Catholic":800,"Baptist":85,"Methodist":70,"Lutheran":75,"Presbyterian":75,"Episcopal":60,"Pentecostal":75,"Assemblies of God":100,"Non-denominational":120,"Latter-day Saints":180,"Church of Christ":65,"Church of God":70,"Orthodox":60,"Seventh-day Adventist":55,"Evangelical":100,"Jehovah's Witnesses":70,"Nazarene":65,"Congregational":55,"Mennonite":55,"Amish":80,"Reformed":75,"Salvation Army":35,"Christian Science":25,"Unitarian":50,"Quaker":25,"Covenant":80,"Disciples of Christ":70};
-const ARDA:Record<string,number>={"Catholic":849,"Baptist":119,"Methodist":54,"Lutheran":66,"Presbyterian":59,"Episcopal":54,"Pentecostal":79,"Assemblies of God":106,"Non-denominational":143,"Latter-day Saints":173,"Church of Christ":66,"Church of God":70,"Orthodox":60,"Seventh-day Adventist":75,"Evangelical":84,"Jehovah's Witnesses":62,"Nazarene":52,"Congregational":36,"Mennonite":66,"Amish":88,"Reformed":63,"Salvation Army":30,"Christian Science":21,"Unitarian":44,"Quaker":22,"Covenant":75,"Disciples of Christ":36};
+// Middle East church attendance medians (generally smaller congregations)
+const DMED:Record<string,number>={
+  "Coptic Orthodox":150,"Greek Orthodox":100,"Armenian Apostolic":80,"Syriac Orthodox":60,
+  "Antiochian Orthodox":80,"Ethiopian Orthodox":100,"Eritrean Orthodox":60,"Orthodox":80,
+  "Maronite Catholic":200,"Melkite Catholic":100,"Chaldean Catholic":80,"Coptic Catholic":60,
+  "Armenian Catholic":50,"Syriac Catholic":50,"Catholic":150,
+  "Assyrian Church of the East":50,
+  "Anglican":80,"Lutheran":60,"Presbyterian":60,"Methodist":50,"Baptist":70,
+  "Assemblies of God":100,"Pentecostal":80,"Evangelical":100,
+  "Seventh-day Adventist":40,"Non-denominational":120,"Salvation Army":30
+};
+// ARDA equivalents not available for Middle East; use DMED as fallback
+const ARDA:Record<string,number>=DMED;
 
 // ── Blocked denominations (fully excluded) ──
+// Same exclusions apply for Middle East version
 const BLOCKED_DENOMINATIONS_CANONICAL=new Set<string>([
   "Latter-day Saints",
   "Jehovah's Witnesses",
@@ -222,7 +273,8 @@ async function ovpQ(q:string,label:string):Promise<any[]>{
 function bQ(iso:string,bbox?:[number,number,number,number]):string{
   const f=bbox?`(area.searchArea)(${bbox.join(",")})`:"(area.searchArea)";
   // Request up to 10000 elements per query; public Overpass may still cap at 2000
-  return`[out:json][timeout:90];area["ISO3166-2"="${iso}"]->.searchArea;(node["amenity"="place_of_worship"]["religion"="christian"]${f};way["amenity"="place_of_worship"]["religion"="christian"]${f};relation["amenity"="place_of_worship"]["religion"="christian"]${f};);out geom 10000;`;
+  // Use ISO3166-1 for countries (not ISO3166-2 which is for subdivisions)
+  return`[out:json][timeout:90];area["ISO3166-1"="${iso}"]->.searchArea;(node["amenity"="place_of_worship"]["religion"="christian"]${f};way["amenity"="place_of_worship"]["religion"="christian"]${f};relation["amenity"="place_of_worship"]["religion"="christian"]${f};);out geom 10000;`;
 }
 function splitB(b:[number,number,number,number]):[number,number,number,number][]{const[s,w,n,e]=b,mL=(s+n)/2,mN=(w+e)/2;return[[s,w,mL,mN],[s,mN,mL,e],[mL,w,n,mN],[mL,mN,n,e]];}
 
@@ -251,7 +303,8 @@ function parse(els:any[],st:string):any[]{
 
 async function fetchCh(st:string):Promise<any[]>{
   const info=gS(st);if(!info)throw new Error(`Unknown: ${st}`);
-  const iso=`US-${st.toUpperCase()}`,b=B[st.toUpperCase()];
+  // Use ISO 3166-1 alpha-2 country code directly
+  const iso=st.toUpperCase(),b=B[st.toUpperCase()];
   if(BIG.has(st.toUpperCase())&&b){
     const qs=splitB(b);const seen=new Set<string>();let all:any[]=[];
     const failed:number[]=[];
@@ -270,7 +323,6 @@ async function fetchCh(st:string):Promise<any[]>{
     return all;
   }
   const els=await ovpQ(bQ(iso),st);let ch=parse(els,st);
-  if(st.toUpperCase()==="MD"){try{const dc=await ovpQ(bQ("US-DC"),"DC");const d=parse(dc,"MD");const seen=new Set(ch.map((c:any)=>c.id));for(const c of d)if(!seen.has(c.id))ch.push(c);}catch(_){}}
   return ch;
 }
 
@@ -365,8 +417,7 @@ app.get(`${P}/og-image`,async(c)=>{
 app.get(`${P}/churches/states`,async(c)=>{
   try{
     const meta=await kv.get("churches:meta");const sc:Record<string,number>={...(meta?.stateCounts||{})};
-    if(sc["DC"]){sc["MD"]=(sc["MD"]||0)+sc["DC"];delete sc["DC"];}
-    return c.json({states:US.map(s=>({abbrev:s.a,name:s.n,lat:s.la,lng:s.lo,churchCount:sc[s.a]||0,isPopulated:!!sc[s.a]})),totalChurches:Object.values(sc).reduce((a:number,b:number)=>a+b,0),populatedStates:Object.keys(sc).length});
+    return c.json({states:ME.map(s=>({abbrev:s.a,name:s.n,lat:s.la,lng:s.lo,churchCount:sc[s.a]||0,isPopulated:!!sc[s.a]})),totalChurches:Object.values(sc).reduce((a:number,b:number)=>a+b,0),populatedStates:Object.keys(sc).length});
   }catch(e){return c.json({states:[],totalChurches:0,populatedStates:0,error:`${e}`},500);}
 });
 
@@ -376,12 +427,11 @@ app.get(`${P}/churches/search`,async(c)=>{
     if(!q||q.length<2)return c.json({results:[],query:rawQ});
     const tokens=q.split(/\s+/).filter(Boolean);
     const meta=await kv.get("churches:meta");const sc:Record<string,number>={...(meta?.stateCounts||{})};
-    if(sc["DC"]){sc["MD"]=(sc["MD"]||0)+sc["DC"];delete sc["DC"];}
     const pop=Object.keys(sc);if(!pop.length)return c.json({results:[],query:rawQ});
 
-    let stP=(c.req.query("state")||"").toUpperCase().trim();if(stP==="DC")stP="MD";
+    let stP=(c.req.query("state")||"").toUpperCase().trim();
     const rawPriority=(c.req.query("priorityStates")||"").trim();
-    const priorityStatesParam=rawPriority?rawPriority.split(",").map((s:string)=>s.trim().toUpperCase()).filter(Boolean).map((s:string)=>s==="DC"?"MD":s).filter((s:string)=>pop.includes(s)):[];
+    const priorityStatesParam=rawPriority?rawPriority.split(",").map((s:string)=>s.trim().toUpperCase()).filter(Boolean).filter((s:string)=>pop.includes(s)):[];
 
     let limit:number;
     if(stP&&pop.includes(stP))limit=Math.min(parseInt(c.req.query("limit")||"100")||100,200);
@@ -389,14 +439,13 @@ app.get(`${P}/churches/search`,async(c)=>{
     else limit=Math.min(parseInt(c.req.query("limit")||"10")||10,25);
 
     const sM:Record<string,string>={};
-    for(const s of US){sM[s.a.toLowerCase()]=s.a;sM[s.n.toLowerCase()]=s.a;}
-    sM["dc"]="MD";sM["d.c."]="MD";sM["district of columbia"]="MD";
+    for(const s of ME){sM[s.a.toLowerCase()]=s.a;sM[s.n.toLowerCase()]=s.a;}
 
     let target=pop,search=tokens;
     if(stP&&pop.includes(stP)){target=[stP];}
     else if(!priorityStatesParam.length){
       const det:string[]=[],txt:string[]=[],used=new Set<number>(),full=tokens.join(" ");
-      for(const s of US){const ln=s.n.toLowerCase();if(ln.includes(" ")&&full.includes(ln)&&pop.includes(s.a)){if(!det.includes(s.a))det.push(s.a);const ws=ln.split(" ");let sf=0;for(const w of ws){for(let i=sf;i<tokens.length;i++){if(!used.has(i)&&tokens[i]===w){used.add(i);sf=i+1;break;}}}}}
+      for(const s of ME){const ln=s.n.toLowerCase();if(ln.includes(" ")&&full.includes(ln)&&pop.includes(s.a)){if(!det.includes(s.a))det.push(s.a);const ws=ln.split(" ");let sf=0;for(const w of ws){for(let i=sf;i<tokens.length;i++){if(!used.has(i)&&tokens[i]===w){used.add(i);sf=i+1;break;}}}}}
       for(let i=0;i<tokens.length;i++){if(used.has(i))continue;const m=sM[tokens[i]];if(m&&pop.includes(m)){det.push(m);used.add(i);}else txt.push(tokens[i]);}
       if(det.length){target=[...new Set(det)];search=txt;}
     }
@@ -407,8 +456,8 @@ app.get(`${P}/churches/search`,async(c)=>{
       const priorityOrdered=priorityStatesParam.filter((s:string)=>pop.includes(s));
       numPriorityStates=priorityOrdered.length;
       const rest=pop.filter((s:string)=>!priorityOrdered.includes(s));
-      exp=[...priorityOrdered,...rest];if(exp.includes("MD")&&!exp.includes("DC"))exp.push("DC");
-    }else{exp=[...target];if(target.includes("MD")&&!target.includes("DC"))exp.push("DC");}
+      exp=[...priorityOrdered,...rest];
+    }else{exp=[...target];}
 
     const COLLECT_CAP=priorityStatesParam.length?limit*5:500;
     const lastPriorityIdx=numPriorityStates>0?numPriorityStates-1:-1;
@@ -519,10 +568,9 @@ async function resolveHomeCampus(churches:any[],currentState:string):Promise<voi
 app.get(`${P}/churches/:state`,async(c)=>{
   try{
     const st=c.req.param("state").toUpperCase(),info=gS(st);
-    if(!info)return c.json({error:`Unknown state: ${st}`},400);
+    if(!info)return c.json({error:`Unknown country: ${st}`},400);
     let ch=await kv.get(`churches:${st}`);
     if(!ch||!Array.isArray(ch)||!ch.length)return c.json({churches:[],state:{abbrev:info.a,name:info.n,lat:info.la,lng:info.lo},fromCache:false,message:`No data for ${info.n}. POST /churches/populate/${st} to fetch.`});
-    if(st==="MD"){try{const dc=await kv.get("churches:DC");if(Array.isArray(dc)&&dc.length){const ids=new Set(ch.map((c:any)=>c.id));for(const x of dc)if(!ids.has(x.id))ch.push({...x,state:"MD"});}}catch(_){}}
     const corrections=await getApprovedCorrectionsForState(st);
     mergeCorrectionsIntoChurches(ch,corrections);
     const withShort=addShortIds(ch,st);
@@ -537,7 +585,7 @@ app.get(`${P}/churches/:state`,async(c)=>{
 app.post(`${P}/churches/populate/:state`,async(c)=>{
   try{
     const st=c.req.param("state").toUpperCase(),info=gS(st);
-    if(!info)return c.json({error:`Unknown state: ${st}`},400);
+    if(!info)return c.json({error:`Unknown country: ${st}`},400);
     const force=c.req.query("force")==="true";
     const ex=await kv.get(`churches:${st}`);
     if(!force&&Array.isArray(ex)&&ex.length)return c.json({message:`${info.n} already has ${ex.length} churches.`,count:ex.length,alreadyCached:true});
@@ -943,9 +991,10 @@ app.post(`${P}/churches/add`,async(c)=>{
     const ip=cip(c);const b=await c.req.json();
     const{name,address:addr,city:ci,state,lat,lng,denomination,attendance,website,serviceTimes,languages,ministries,pastorName,phone,email}=b;
     if(!name||typeof name!=="string"||name.trim().length<2)return c.json({error:"Name required"},400);
-    const st=String(state).toUpperCase();if(!gS(st))return c.json({error:"Invalid state"},400);
+    const st=String(state).toUpperCase();if(!gS(st))return c.json({error:"Invalid country"},400);
     const pLat=parseFloat(lat),pLng=parseFloat(lng);
-    if(isNaN(pLat)||isNaN(pLng)||pLat<18||pLat>72||pLng<-180||pLng>-65)return c.json({error:"Valid US coords required"},400);
+    // Middle East coordinates: lat -13 to 43, lng -18 to 60
+    if(isNaN(pLat)||isNaN(pLng)||pLat<-13||pLat>43||pLng<-18||pLng>60)return c.json({error:"Valid Middle East coords required"},400);
     const att=Math.max(1,Math.min(parseInt(attendance)||50,50000));
     const rawDenom=(denomination??"").trim();
     if(rawDenom&&isBlockedDenomination(rawDenom))return c.json({error:"Denomination not supported"},400);
@@ -1049,7 +1098,7 @@ app.post(`${P}/migrate/apply-pending`,async(c)=>{
       }
     }
     // 2. Merge all pending churches into main data
-    const states=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"];
+    const states=["SA","AE","QA","KW","BH","OM","JO","LB","SY","IQ","EG","LY","TN","DZ","MA","MR","SD","YE","DJ","KM","SO","PS","TR"];
     for(const st of states){
       const store=await kv.get(`pending-churches:${st}`);
       if(!store||!Array.isArray(store.churches)||!store.churches.length)continue;

@@ -62,7 +62,7 @@ export const ChurchDots = memo(function ChurchDots({
     const result: ProjectedChurch[] = [];
     for (const ch of churches) {
       const coords = projection([ch.lng, ch.lat]);
-      if (!coords) continue; // geoAlbersUsa returns null outside domain
+      if (!coords) continue; // projection returns null outside domain
       const cat = getSizeCategory(ch.attendance);
       result.push({
         id: ch.id,
@@ -79,7 +79,7 @@ export const ChurchDots = memo(function ChurchDots({
   // ── Viewport cull (runs when center/zoom changes after pan ends) ──
   const visible = useMemo(() => {
     if (!projection || projected.length === 0) return projected;
-    // At zoom ≤ 1.5 the whole US is visible — skip culling
+    // At zoom ≤ 1.5 the whole region is visible — skip culling
     if (zoom <= 1.5) return projected;
 
     // Convert geographic center → SVG coordinates

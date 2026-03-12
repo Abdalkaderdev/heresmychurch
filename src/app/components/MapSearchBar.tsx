@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Search, ChevronRight, Loader2, MapPin, ChevronDown, Plus } from "lucide-react";
-import { geoAlbersUsa } from "d3-geo";
+import { geoMercator } from "d3-geo";
 import type { Church, StateInfo } from "./church-data";
 import { getFallbackLocation, formatAddressWithCity } from "./church-data";
 import { searchChurches } from "./api";
@@ -140,8 +140,8 @@ export function MapSearchBar({
       .sort((a, b) => (STATE_NAMES[a.abbrev] || a.abbrev).localeCompare(STATE_NAMES[b.abbrev] || b.abbrev));
   }, [states]);
 
-  // Projection matching react-simple-maps (geoAlbersUsa, scale 1000) for viewport filtering
-  const projection = useMemo(() => geoAlbersUsa().scale(1000), []);
+  // Projection matching react-simple-maps (geoMercator centered on Middle East) for viewport filtering
+  const projection = useMemo(() => geoMercator().center([40, 28]).scale(600), []);
 
   // Local search for state view (all matches, no viewport filter); ranked by name then city/address
   const localResultsRaw = useMemo(() => {
@@ -331,7 +331,7 @@ export function MapSearchBar({
           style={{ backgroundColor: "rgba(30, 16, 64, 0.97)" }}
         >
           <div className="px-3 py-2 text-[10px] font-medium text-white/30 uppercase tracking-wider border-b border-white/5">
-            Filter by state
+            Filter by country
           </div>
           <button
             className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
@@ -343,7 +343,7 @@ export function MapSearchBar({
             }}
           >
             <MapPin size={12} className="flex-shrink-0 opacity-50" />
-            All states
+            All countries
           </button>
           {populatedStates.map((s) => (
             <button

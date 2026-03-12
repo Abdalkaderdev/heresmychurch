@@ -139,13 +139,12 @@ export function SummaryPanel({
             Not all churches may be represented yet — our goal is for every church to be included.{" "}
             {focusedState
               ? "Find your church or add it below!"
-              : "Click any state to find or add your church!"}
+              : "Click any country to find or add your church!"}
           </p>
           <p className="text-white/20 text-[10px] text-center leading-relaxed">
-            Church data and building footprints from OpenStreetMap via Overpass API{" "}&middot;{" "}
-            Cross-referenced with The Association of Religion Data Archives (ARDA){" "}&middot;{" "}
-            Population from U.S. Census Bureau{" "}&middot;{" "}
-            Boundaries from Natural Earth / U.S. Census TIGER
+            Church data from OpenStreetMap via Overpass API{" "}&middot;{" "}
+            Population from World Bank{" "}&middot;{" "}
+            Boundaries from Natural Earth
           </p>
         </div>
       </div>
@@ -308,24 +307,24 @@ function NationalSummaryContent({
           <>
             Currently tracking <span className="font-medium text-white">{totalChurches.toLocaleString()} churches</span> across{" "}
             <span className="font-medium text-purple-300">
-              {allStatesLoaded ? "50 states" : `${stats.populated} states`}
+              {allStatesLoaded ? "23 countries" : `${stats.populated} countries`}
             </span>.
             {stats.nationalPeoplePer != null && stats.populationMillions != null && (
               <> That&apos;s about <span className="font-medium text-white">1 church per {stats.nationalPeoplePer.toLocaleString()} people</span>, covering <span className="font-medium text-white">{stats.populationMillions} million people</span>.</>
             )}
             {!allStatesLoaded && stats.unpopulated > 0 && (
-              <> <span className="text-white/50">{stats.unpopulated} states haven&apos;t been explored yet.</span></>
+              <> <span className="text-white/50">{stats.unpopulated} countries haven&apos;t been explored yet.</span></>
             )}
           </>
         ) : (
-          <>Click any state on the map to fetch its church data from OpenStreetMap.</>
+          <>Click any country on the map to fetch its church data from OpenStreetMap.</>
         )}
       </p>
 
       {/* Community impact (nation-wide totals) */}
       <CommunityStatsCard key="national" />
 
-      {/* Top 3 states by church count — podium style */}
+      {/* Top 3 countries by church count — podium style */}
       {stats.topStates.length > 0 && (
         <div>
           <span className="text-[10px] uppercase tracking-widest text-purple-400/70 font-medium block mb-2">
@@ -354,11 +353,11 @@ function NationalSummaryContent({
       {/* Interesting facts */}
       <FactsList facts={stats.interestingFacts} onNavigateToState={onNavigateToState} />
 
-      {/* Unloaded states hint */}
+      {/* Unloaded countries hint */}
       {stats.unpopulated > 0 && (
         <div className="rounded-lg bg-purple-900/20 border border-purple-500/10 px-3 py-2.5">
           <p className="text-white/40 text-[11px] leading-relaxed text-center">
-            {stats.unpopulated} state{stats.unpopulated > 1 ? "s" : ""} remaining — click any state to fetch its data from OpenStreetMap
+            {stats.unpopulated} {stats.unpopulated > 1 ? "countries" : "country"} remaining — click any country to fetch its data from OpenStreetMap
           </p>
         </div>
       )}
