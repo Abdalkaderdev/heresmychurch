@@ -75,7 +75,7 @@ const BOUNDS: Record<string, [number, number, number, number]> = {
   TR: [35.82, 25.67, 42.11, 44.82],
 };
 
-const BIG_COUNTRIES = new Set(["EG", "SA", "DZ", "SD", "TR", "LY", "IQ", "MA"]);
+const BIG_COUNTRIES = new Set(["EG", "SA", "DZ", "SD", "TR", "LY", "IQ"]);
 
 const POPULATIONS: Record<string, number> = {
   SA: 36400000, AE: 9440000, QA: 2700000, KW: 4300000, BH: 1500000,
