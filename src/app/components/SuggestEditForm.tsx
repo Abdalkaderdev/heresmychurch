@@ -27,6 +27,25 @@ import { AddressInput, serializeAddress, parseAddressValue } from "./AddressInpu
 import { geocodeAddress } from "./AddChurchForm";
 import { normalizePhone } from "./ui/utils";
 import { CloseButton } from "./ui/close-button";
+import { STATE_NAMES, STATE_NEIGHBORS } from "./map-constants";
+
+function normalizeStateAbbrev(churchState: string | undefined, churchId: string): string {
+  const s = (churchState ?? "").trim();
+  const u = s.toUpperCase();
+  if (u.length === 2) return u;
+  const byName = Object.entries(STATE_NAMES).find(([, name]) => name.toUpperCase() === u);
+  if (byName) return byName[0];
+  if (!churchId?.trim()) return "";
+  const id = churchId.trim();
+  if (id.startsWith("community-")) {
+    const parts = id.split("-");
+    const abbr = (parts[1] ?? "").toUpperCase().slice(0, 2);
+    return abbr.length === 2 ? abbr : "";
+  }
+  const dash = id.indexOf("-");
+  if (dash === 2) return id.slice(0, 2).toUpperCase();
+  return "";
+}
 
 interface SuggestEditFormProps {
   church: Church;
@@ -323,11 +342,13 @@ export function SuggestEditForm({ church, onClose, focusField, onChurchUpdated }
 // ── Main campus search (for homeCampusId field) ──
 function MainCampusSearch({
   currentChurchId,
+  churchState,
   onSelect,
   submitting,
   onCancel,
 }: {
   currentChurchId: string;
+  churchState: string;
   onSelect: (churchId: string) => void;
   submitting: boolean;
   onCancel: () => void;
@@ -337,6 +358,15 @@ function MainCampusSearch({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stateNorm = normalizeStateAbbrev(churchState, currentChurchId);
+
+  const priorityStates = (() => {
+    if (!stateNorm) return undefined;
+    const neighbors = STATE_NEIGHBORS[stateNorm] || [];
+    const list = Array.from(new Set([stateNorm, ...neighbors].filter((s) => s.length === 2)));
+    return list.length ? list : undefined;
+  })();
 
   useEffect(() => {
     const q = query.trim();
@@ -350,8 +380,27 @@ function MainCampusSearch({
     setError(null);
     timeoutRef.current = setTimeout(() => {
       timeoutRef.current = null;
-      searchChurches(q, 20)
-        .then((data) => setResults((data.results || []).filter((r) => r.id !== currentChurchId)))
+      searchChurches(q, 20, undefined, priorityStates)
+        .then((data) => {
+          const filtered = (data.results || []).filter((r) => r.id !== currentChurchId);
+          const norm = (x: string) => (x ?? "").trim().toUpperCase().slice(0, 2);
+          const neighborSet = stateNorm ? new Set((STATE_NEIGHBORS[stateNorm] || []).map((s) => s.toUpperCase())) : new Set<string>();
+          const tier = (r: SearchResult) => {
+            const st = norm(r.state ?? "");
+            if (!st) return 2;
+            if (stateNorm && (st === stateNorm || (stateNorm === "DC" && st === "MD") || (stateNorm === "MD" && st === "DC")))
+              return 0;
+            if (neighborSet.has(st)) return 1;
+            return 2;
+          };
+          filtered.sort((a, b) => {
+            const ta = tier(a);
+            const tb = tier(b);
+            if (ta !== tb) return ta - tb;
+            return (a.name || "").localeCompare(b.name || "");
+          });
+          setResults(filtered);
+        })
         .catch((err) => {
           setError(err?.message || "Search failed");
           setResults([]);
@@ -359,7 +408,7 @@ function MainCampusSearch({
         .finally(() => setLoading(false));
     }, 300);
     return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
-  }, [query, currentChurchId]);
+  }, [query, currentChurchId, stateNorm, priorityStates?.join(",") ?? ""]);
 
   return (
     <div className="space-y-2">
@@ -530,6 +579,7 @@ function FieldCard({
               {isMainCampusSearch && onSubmitWithValue ? (
                 <MainCampusSearch
                   currentChurchId={church.id}
+                  churchState={church.state}
                   onSelect={(id) => onSubmitWithValue?.(id)}
                   submitting={isSubmitting}
                   onCancel={onCancelEdit}

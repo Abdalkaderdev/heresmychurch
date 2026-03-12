@@ -792,7 +792,7 @@ export function ChurchDetailPanel({
               {correctionHistory.slice(0, 5).map((entry, i) => (
                 <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03]">
                   <Check size={12} className="text-green-400/60 flex-shrink-0" />
-                  <span className="text-white/50 text-xs font-medium capitalize">{entry.field === "serviceTimes" ? "Service Times" : entry.field === "pastorName" ? "Pastor" : entry.field}</span>
+                  <span className="text-white/50 text-xs font-medium capitalize">{entry.field === "serviceTimes" ? "Service Times" : entry.field === "pastorName" ? "Pastor" : entry.field === "homeCampusId" ? "Link to main campus" : entry.field}</span>
                   <span className="text-white/30 text-xs ml-auto">{formatTimeAgo(entry.appliedAt)}</span>
                 </div>
               ))}

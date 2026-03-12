@@ -380,7 +380,14 @@ app.get(`${P}/churches/search`,async(c)=>{
     const pop=Object.keys(sc);if(!pop.length)return c.json({results:[],query:rawQ});
 
     let stP=(c.req.query("state")||"").toUpperCase().trim();if(stP==="DC")stP="MD";
-    const limit=(stP&&pop.includes(stP))?Math.min(parseInt(c.req.query("limit")||"100")||100,200):Math.min(parseInt(c.req.query("limit")||"10")||10,25);
+    const rawPriority=(c.req.query("priorityStates")||"").trim();
+    const priorityStatesParam=rawPriority?rawPriority.split(",").map((s:string)=>s.trim().toUpperCase()).filter(Boolean).map((s:string)=>s==="DC"?"MD":s).filter((s:string)=>pop.includes(s)):[];
+
+    let limit:number;
+    if(stP&&pop.includes(stP))limit=Math.min(parseInt(c.req.query("limit")||"100")||100,200);
+    else if(priorityStatesParam.length)limit=Math.min(parseInt(c.req.query("limit")||"20")||20,100);
+    else limit=Math.min(parseInt(c.req.query("limit")||"10")||10,25);
+
     const sM:Record<string,string>={};
     for(const s of US){sM[s.a.toLowerCase()]=s.a;sM[s.n.toLowerCase()]=s.a;}
     sM["dc"]="MD";sM["d.c."]="MD";sM["district of columbia"]="MD";
@@ -394,18 +401,27 @@ app.get(`${P}/churches/search`,async(c)=>{
       if(det.length){target=[...new Set(det)];search=txt;}
     }
 
-    const exp=[...target];if(target.includes("MD")&&!target.includes("DC"))exp.push("DC");
+    let exp:string[];
+    let numPriorityStates=0;
+    if(priorityStatesParam.length&&!stP){
+      const priorityOrdered=priorityStatesParam.filter((s:string)=>pop.includes(s));
+      numPriorityStates=priorityOrdered.length;
+      const rest=pop.filter((s:string)=>!priorityOrdered.includes(s));
+      exp=[...priorityOrdered,...rest];if(exp.includes("MD")&&!exp.includes("DC"))exp.push("DC");
+    }else{exp=[...target];if(target.includes("MD")&&!target.includes("DC"))exp.push("DC");}
 
     const COLLECT_CAP=500;
+    const lastPriorityIdx=numPriorityStates>0?numPriorityStates-1:-1;
     const candidates:Array<{score:number,id:string,shortId:string,name:string,city:string,state:string,denomination:string,attendance:number,lat:number,lng:number,address:string}>=[];
     const seen=new Set<string>();
+    let idx=0;
     for(const st of exp){
       if(candidates.length>=COLLECT_CAP)break;
       const realSt=st==="DC"?"MD":st;
       let items:any[]=null;
       try{
-        const idx=await kv.get(`churches:sidx:${st}`);
-        if(Array.isArray(idx)&&idx.length){items=idx;}
+        const idxKey=await kv.get(`churches:sidx:${st}`);
+        if(Array.isArray(idxKey)&&idxKey.length){items=idxKey;}
         else{
           const raw=await kv.get(`churches:${st}`);
           if(Array.isArray(raw)&&raw.length)items=raw;
@@ -422,8 +438,22 @@ app.get(`${P}/churches/search`,async(c)=>{
         const row={id:e.id,shortId:toShortId(e.id,realSt,e.shortId),name:n||"Unknown Church",city:ci,state:realSt,denomination:d||"Unknown",attendance:isIdx?e.a:e.attendance,lat:isIdx?e.la:e.lat,lng:isIdx?e.lo:e.lng,address:ad||""};
         candidates.push({score:scoreMatch(q,n,ci,ad),...row});
       }
+      if(lastPriorityIdx>=0&&idx===lastPriorityIdx&&candidates.length>=limit)break;
+      idx++;
     }
     candidates.sort((a,b)=>b.score-a.score||(a.name||"").localeCompare(b.name||""));
+    if(priorityStatesParam.length>0){
+      const normSt=(x:string)=>((x||"").trim().toUpperCase().slice(0,2));
+      const p0=normSt(priorityStatesParam[0]);
+      const pSet=new Set(priorityStatesParam.map(normSt));
+      candidates.sort((a,b)=>{
+        const sa=normSt(a.state),sb=normSt(b.state);
+        const tierA=sa===p0?0:(pSet.has(sa)?1:2);
+        const tierB=sb===p0?0:(pSet.has(sb)?1:2);
+        if(tierA!==tierB)return tierA-tierB;
+        return b.score-a.score||(a.name||"").localeCompare(b.name||"");
+      });
+    }
     const results=candidates.slice(0,limit).map(({score,...r})=>r);
     return c.json({results,query:rawQ,statesSearched:target.length,stateFilter:target.length<pop.length?target:undefined});
   }catch(e){return c.json({results:[],query:rawQ,error:`${e}`},500);}

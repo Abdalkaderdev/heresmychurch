@@ -794,11 +794,11 @@ function HeaderPill({
       >
         <ChurchIcon size={18} className="text-purple-300 flex-shrink-0" />
         {focusedState ? (
-          <span className="text-white text-sm text-pretty min-w-0 truncate flex items-center gap-2">
-            <span className="font-medium">
+          <span className="text-white text-sm text-pretty min-w-0 truncate flex items-center gap-1.5">
+            <span className="font-medium whitespace-nowrap">
               {filteredCount === 0 ? "Loading churches" : `${filteredCount.toLocaleString()} churches`}
-            </span>{" "}
-            in{" "}
+              {" in "}
+            </span>
             <span className="text-white font-medium flex items-center gap-1.5">
               <StateFlag abbrev={focusedState} size="sm" />
               {focusedStateName}

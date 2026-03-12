@@ -454,10 +454,15 @@ export interface SearchResponse {
 export async function searchChurches(
   query: string,
   limit: number = 10,
-  state?: string
+  state?: string,
+  priorityStates?: string[]
 ): Promise<SearchResponse> {
   let url = `${BASE_URL}/churches/search?q=${encodeURIComponent(query)}&limit=${limit}`;
-  if (state) url += `&state=${encodeURIComponent(state.toUpperCase())}`;
+  if (priorityStates?.length) {
+    url += `&priorityStates=${priorityStates.map((s) => s.toUpperCase()).join(",")}`;
+  } else if (state) {
+    url += `&state=${encodeURIComponent(state.toUpperCase())}`;
+  }
   const res = await fetchWithRetry(url, { headers, timeoutMs: 15000 });
   if (!res.ok) {
     const text = await res.text();
