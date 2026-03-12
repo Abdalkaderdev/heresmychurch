@@ -38,6 +38,7 @@ import { fetchNationalReviewStats } from "./api";
 import type { NationalReviewStatsResponse } from "./api";
 import { useIsMobile } from "./ui/use-mobile";
 import { PendingAlertsPill } from "./PendingAlertsPill";
+import { AnnouncementsPill } from "./AnnouncementsPill";
 import { reportIssueEnabled } from "../config/pendingAlerts";
 import { useReducer, useEffect, useMemo, useState } from "react";
 import logoImg from "../../assets/a94bce1cf0860483364d5d9c353899b7da8233e7.png";
@@ -111,16 +112,18 @@ export function ChurchMap({
     showAbout: !hasSeenAbout && !routeStateAbbrev,
     showHelp: false,
     showAlertsPanel: false,
+    showAnnouncementsPanel: false,
   alertsPanelOpenedViaReportIssue: false,
   });
 
-  const anyOverlayOpen = d.showSummary || d.showFilterPanel || d.showLegend || local.showAlertsPanel || (isNationalView && isMobile && !effectiveSearchCollapsed);
+  const anyOverlayOpen = d.showSummary || d.showFilterPanel || d.showLegend || local.showAlertsPanel || local.showAnnouncementsPanel || (isNationalView && isMobile && !effectiveSearchCollapsed);
   const dismissAllOverlays = () => {
     d.setShowSummary(false);
     d.setShowFilterPanel(false);
     d.setShowLegend(false);
     d.setSearchCollapsed(true);
     localDispatch({ type: "SET", key: "showAlertsPanel", value: false });
+    localDispatch({ type: "SET", key: "showAnnouncementsPanel", value: false });
     localDispatch({ type: "SET", key: "alertsPanelOpenedViaReportIssue", value: false });
   };
 
@@ -240,6 +243,10 @@ export function ChurchMap({
         onAlertsPanelChange={(open) => {
           localDispatch({ type: "SET", key: "showAlertsPanel", value: open });
           if (!open) localDispatch({ type: "SET", key: "alertsPanelOpenedViaReportIssue", value: false });
+        }}
+        showAnnouncementsPanel={local.showAnnouncementsPanel}
+        onAnnouncementsPanelChange={(open) => {
+          localDispatch({ type: "SET", key: "showAnnouncementsPanel", value: open });
         }}
         activePeople={activePeople}
         activeBots={activeBots}
@@ -391,6 +398,7 @@ type LocalState = {
   showAbout: boolean;
   showHelp: boolean;
   showAlertsPanel: boolean;
+  showAnnouncementsPanel: boolean;
   alertsPanelOpenedViaReportIssue: boolean;
 };
 type LocalAction = { type: "SET"; key: keyof LocalState; value: any };
@@ -426,6 +434,8 @@ function MapArea({
   showAlertsPanel,
   showProposeForm,
   onAlertsPanelChange,
+  showAnnouncementsPanel,
+  onAnnouncementsPanelChange,
   activePeople,
   activeBots,
   isLocalhost,
@@ -457,6 +467,8 @@ function MapArea({
   showAlertsPanel: boolean;
   showProposeForm: boolean;
   onAlertsPanelChange: (open: boolean) => void;
+  showAnnouncementsPanel: boolean;
+  onAnnouncementsPanelChange: (open: boolean) => void;
   activePeople: number;
   activeBots: number;
   isLocalhost: boolean;
@@ -490,14 +502,18 @@ function MapArea({
             }}
           />
 
-          {/* Pending errors — below header pill */}
+          {/* Pending errors + announcements — below header pill */}
           {!d.showSummary && (
-            <div className="mt-1.5">
+            <div className="mt-1.5 flex flex-wrap items-center justify-center gap-2">
               <PendingAlertsPill
                 open={showAlertsPanel}
                 onOpenChange={onAlertsPanelChange}
                 showProposeForm={showProposeForm}
                 showReportIssue={showReportIssue}
+              />
+              <AnnouncementsPill
+                open={showAnnouncementsPanel}
+                onOpenChange={onAnnouncementsPanelChange}
               />
             </div>
           )}
