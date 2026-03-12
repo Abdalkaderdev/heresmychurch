@@ -984,6 +984,123 @@ async function handleDenominationsAll(req: VercelRequest, res: VercelResponse) {
 }
 
 // ============================================================================
+// Reactions Handlers
+// ============================================================================
+
+type ReactionType = 'not_for_me' | 'like' | 'love';
+
+interface ReactionData {
+  counts: { not_for_me: number; like: number; love: number };
+  userReactions: Record<string, ReactionType>;
+}
+
+async function handleGetReactions(req: VercelRequest, res: VercelResponse, churchId: string) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const userIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+    const userHash = hashIp(userIp);
+
+    const reactionKey = `reactions:${churchId}`;
+    const data = await kv.get<ReactionData>(reactionKey);
+
+    const counts = data?.counts || { not_for_me: 0, like: 0, love: 0 };
+    const myReaction = data?.userReactions?.[userHash] || null;
+
+    return res.status(200).json({
+      churchId,
+      counts,
+      myReaction,
+    });
+  } catch (e) {
+    console.error('Error fetching reactions:', e);
+    return res.status(500).json({ error: String(e) });
+  }
+}
+
+async function handleSubmitReaction(req: VercelRequest, res: VercelResponse, churchId: string) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const { reaction } = req.body as { reaction: ReactionType };
+    if (!reaction || !['not_for_me', 'like', 'love'].includes(reaction)) {
+      return res.status(400).json({ error: 'Invalid reaction type' });
+    }
+
+    const userIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+    const userHash = hashIp(userIp);
+
+    const reactionKey = `reactions:${churchId}`;
+    const data = (await kv.get<ReactionData>(reactionKey)) || {
+      counts: { not_for_me: 0, like: 0, love: 0 },
+      userReactions: {},
+    };
+
+    const previousReaction = data.userReactions[userHash];
+
+    // Toggle off if same reaction
+    if (previousReaction === reaction) {
+      data.counts[reaction] = Math.max(0, data.counts[reaction] - 1);
+      delete data.userReactions[userHash];
+    } else {
+      // Remove previous reaction count if exists
+      if (previousReaction) {
+        data.counts[previousReaction] = Math.max(0, data.counts[previousReaction] - 1);
+      }
+      // Add new reaction
+      data.counts[reaction]++;
+      data.userReactions[userHash] = reaction;
+    }
+
+    await kv.set(reactionKey, data);
+
+    return res.status(200).json({
+      success: true,
+      churchId,
+      counts: data.counts,
+      myReaction: data.userReactions[userHash] || null,
+    });
+  } catch (e) {
+    console.error('Error submitting reaction:', e);
+    return res.status(500).json({ error: String(e) });
+  }
+}
+
+async function handleGetReactionsBulk(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const rawState = req.query.state;
+    const state = (Array.isArray(rawState) ? rawState[0] : rawState)?.toUpperCase();
+
+    if (!state) {
+      return res.status(400).json({ error: 'State parameter required' });
+    }
+
+    const churches = await kv.get<Church[]>(`churches:${state}`);
+    if (!churches || !Array.isArray(churches)) {
+      return res.status(200).json({ state, counts: {} });
+    }
+
+    const counts: Record<string, { not_for_me: number; like: number; love: number }> = {};
+
+    // Get reactions for each church (batch would be better but this works for now)
+    for (const church of churches.slice(0, 100)) { // Limit to avoid timeout
+      const reactionKey = `reactions:${church.id}`;
+      const data = await kv.get<ReactionData>(reactionKey);
+      if (data?.counts) {
+        counts[church.id] = data.counts;
+      }
+    }
+
+    return res.status(200).json({ state, counts });
+  } catch (e) {
+    console.error('Error fetching reactions bulk:', e);
+    return res.status(500).json({ error: String(e) });
+  }
+}
+
+// ============================================================================
 // Main Router
 // ============================================================================
 
@@ -1003,6 +1120,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path[0] === 'pending' && path.length === 2) return handleGetPending(req, res, path[1]);
     if (path[0] === 'verify' && path.length === 2) return handleVerify(req, res, path[1]);
     if (path[0] === 'confirm' && path.length === 2) return handleConfirm(req, res, path[1]);
+
+    // Reactions routes
+    if (path[0] === 'reactions' && path[1] === 'bulk') return handleGetReactionsBulk(req, res);
+    if (path[0] === 'reactions' && path.length === 2) return handleGetReactions(req, res, path[1]);
+    if (path[0] === 'react' && path.length === 2) return handleSubmitReaction(req, res, path[1]);
 
     if (path.length === 1 && !['states', 'search', 'add', 'populate', 'pending', 'verify', 'confirm', 'denominations'].includes(path[0])) {
       return handleGetByState(req, res, path[0]);
