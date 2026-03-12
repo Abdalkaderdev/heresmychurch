@@ -143,8 +143,8 @@ export function HelpModal({
               </AccordionTrigger>
               <AccordionContent className="text-white/70">
                 Here&apos;s My Church is a free, open-source, interactive map that helps people
-                discover Christian churches across all 50 U.S. states. No account needed. You can
-                browse by state, search and filter by denomination, size, or language, view church
+                discover Christian churches across the Middle East. No account needed. You can
+                browse by country, search and filter by denomination, size, or language, view church
                 details (address, website, service times, and more), and contribute by adding
                 churches or suggesting edits.
               </AccordionContent>
@@ -165,8 +165,8 @@ export function HelpModal({
               </AccordionTrigger>
               <AccordionContent className="text-white/70 space-y-2">
                 <p>
-                  Click any state on the map to zoom in, then use the &quot;Add a Church&quot; button
-                  in the state summary panel. You can also start a search and you&apos;ll see the
+                  Click any country on the map to zoom in, then use the &quot;Add a Church&quot; button
+                  in the country summary panel. You can also start a search and you&apos;ll see the
                   option to add your church. No account is required.
                 </p>
                 <p className="text-white/50 text-xs italic">

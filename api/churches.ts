@@ -1204,6 +1204,100 @@ async function handlePresenceLeave(req: VercelRequest, res: VercelResponse, chur
 }
 
 // ============================================================================
+// Review Stats Handler
+// ============================================================================
+
+function churchNeedsReview(church: Church): boolean {
+  let missingCount = 0;
+  if (!church.address || church.address.trim() === '') missingCount++;
+  if (!church.serviceTimes || church.serviceTimes.length === 0) missingCount++;
+  if (!church.denomination || church.denomination === 'Unknown' || church.denomination === 'Other') missingCount++;
+  return missingCount >= 2;
+}
+
+async function handleReviewStats(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const meta = await kv.get<{ stateCounts: Record<string, number> }>('churches:meta');
+    const populatedStates = Object.keys(meta?.stateCounts || {});
+
+    let totalChurches = 0;
+    let totalNeedsReview = 0;
+    let missingAddress = 0;
+    let missingServiceTimes = 0;
+    let missingDenomination = 0;
+
+    const statesStats: Record<string, {
+      total: number;
+      needsReview: number;
+      missingAddress: number;
+      missingServiceTimes: number;
+      missingDenomination: number;
+    }> = {};
+
+    for (const state of populatedStates) {
+      const churches = await kv.get<Church[]>(`churches:${state}`);
+      if (!Array.isArray(churches)) continue;
+
+      let stateNeedsReview = 0;
+      let stateMissingAddress = 0;
+      let stateMissingServiceTimes = 0;
+      let stateMissingDenomination = 0;
+
+      for (const church of churches) {
+        let churchMissingCount = 0;
+
+        if (!church.address || church.address.trim() === '') {
+          churchMissingCount++;
+          stateMissingAddress++;
+          missingAddress++;
+        }
+        if (!church.serviceTimes || church.serviceTimes.length === 0) {
+          churchMissingCount++;
+          stateMissingServiceTimes++;
+          missingServiceTimes++;
+        }
+        if (!church.denomination || church.denomination === 'Unknown' || church.denomination === 'Other') {
+          churchMissingCount++;
+          stateMissingDenomination++;
+          missingDenomination++;
+        }
+
+        if (churchMissingCount >= 2) {
+          stateNeedsReview++;
+          totalNeedsReview++;
+        }
+      }
+
+      totalChurches += churches.length;
+      statesStats[state] = {
+        total: churches.length,
+        needsReview: stateNeedsReview,
+        missingAddress: stateMissingAddress,
+        missingServiceTimes: stateMissingServiceTimes,
+        missingDenomination: stateMissingDenomination,
+      };
+    }
+
+    const percentage = totalChurches > 0 ? Math.round((totalNeedsReview / totalChurches) * 1000) / 10 : 0;
+
+    return res.status(200).json({
+      states: statesStats,
+      totalChurches,
+      totalNeedsReview,
+      percentage,
+      missingAddress,
+      missingServiceTimes,
+      missingDenomination,
+    });
+  } catch (e) {
+    console.error('Error computing review stats:', e);
+    return res.status(500).json({ error: String(e) });
+  }
+}
+
+// ============================================================================
 // Main Router
 // ============================================================================
 
@@ -1219,6 +1313,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (route === 'search') return handleSearch(req, res);
     if (route === 'add') return handleAdd(req, res);
     if (route === 'denominations/all') return handleDenominationsAll(req, res);
+    if (route === 'review-stats') return handleReviewStats(req, res);
     if (path[0] === 'populate' && path.length === 2) return handlePopulate(req, res, path[1]);
     if (path[0] === 'pending' && path.length === 2) return handleGetPending(req, res, path[1]);
     if (path[0] === 'verify' && path.length === 2) return handleVerify(req, res, path[1]);

@@ -716,7 +716,7 @@ export function useChurchMapData({
           dd({ type: "SET_TRANSITIONING", value: false });
         }
         if (!refs.current.focusedState) {
-          dd({ type: "SET_CENTER", value: [-96, 38] as [number, number] });
+          dd({ type: "SET_CENTER", value: [40, 28] as [number, number] });
           dd({ type: "SET_ZOOM", value: 1 });
         }
       }, fromChurchView ? 100 : 1050);

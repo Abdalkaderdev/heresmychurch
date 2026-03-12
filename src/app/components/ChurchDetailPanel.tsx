@@ -683,7 +683,7 @@ export function ChurchDetailPanel({
               <span className="text-[10px] uppercase tracking-wider text-white/35 font-semibold">Denomination</span>
             </div>
             <div className="text-white text-base font-medium">{church.denomination === "Other" || church.denomination === "Unknown" ? "Unspecified" : church.denomination}</div>
-            <div className="text-white/40 text-xs mt-0.5">{sameDenomCount.toLocaleString()} similar in state</div>
+            <div className="text-white/40 text-xs mt-0.5">{sameDenomCount.toLocaleString()} similar in country</div>
           </div>
         </div>
 

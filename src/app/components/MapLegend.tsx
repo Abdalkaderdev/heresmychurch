@@ -47,7 +47,7 @@ export function MapLegend({
       </div>
 
       <span className="text-xs font-semibold text-purple-300 uppercase tracking-wider block mb-2">
-        {focusedState ? "Attendance" : "Churches per State"}
+        {focusedState ? "Attendance" : "Churches per Country"}
       </span>
       {focusedState ? (
         <AttendanceLegend

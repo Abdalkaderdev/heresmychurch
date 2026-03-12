@@ -173,7 +173,7 @@ function IncompleteChurchesList({
         <CheckCircle2 size={32} className="text-green-400/40" />
         <p className="text-white/40 text-sm font-medium">All caught up!</p>
         <p className="text-white/25 text-xs text-center max-w-[240px]">
-          No churches are missing critical information in this state.
+          No churches are missing critical information in this country.
         </p>
       </div>
     );
@@ -326,7 +326,7 @@ export function NationalReviewModal({ stats, onClose, onSelectState }: NationalR
             </div>
             <div>
               <h2 className="text-white font-semibold text-lg leading-tight">
-                States Needing Review
+                Countries Needing Review
               </h2>
               <p className="text-white/40 text-xs mt-0.5">
                 {stats
@@ -346,7 +346,7 @@ export function NationalReviewModal({ stats, onClose, onSelectState }: NationalR
                 National review stats could not be loaded. The review-stats API may not be deployed yet, or there was a network error.
               </p>
               <p className="text-white/40 text-xs text-center max-w-[260px]">
-                You can still open any state and use the state-level &ldquo;need review&rdquo; pill to see churches needing review there.
+                You can still open any country and use the country-level &ldquo;need review&rdquo; pill to see churches needing review there.
               </p>
             </div>
           ) : (
@@ -360,7 +360,7 @@ export function NationalReviewModal({ stats, onClose, onSelectState }: NationalR
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search states..."
+                    placeholder="Search countries..."
                     className="w-full pl-10 pr-3 py-3 rounded-full bg-white/[0.05] border border-white/8 text-white text-[15px] placeholder:text-white/25 focus:outline-none focus:border-purple-500/40 transition-colors"
                   />
                 </div>
@@ -370,12 +370,12 @@ export function NationalReviewModal({ stats, onClose, onSelectState }: NationalR
                 <CheckCircle2 size={32} className="text-green-400/40" />
                 <p className="text-white/40 text-sm font-medium">All caught up!</p>
                 <p className="text-white/25 text-xs text-center max-w-[240px]">
-                  No states have churches missing critical information.
+                  No countries have churches missing critical information.
                 </p>
               </div>
             ) : filtered.length === 0 ? (
               <p className="text-white/40 text-xs py-6 text-center">
-                No states found for &ldquo;{search}&rdquo;
+                No countries found for &ldquo;{search}&rdquo;
               </p>
             ) : (
               filtered.map(([abbrev, s]) => {
@@ -411,7 +411,7 @@ export function NationalReviewModal({ stats, onClose, onSelectState }: NationalR
 
         <div className="flex-shrink-0 px-5 py-3 border-t border-white/6 text-pretty">
           <p className="text-white/25 text-[10px] text-center leading-relaxed">
-            Click a state to open its churches needing review. Critical fields: address, service times, denomination.
+            Click a country to open its churches needing review. Critical fields: address, service times, denomination.
           </p>
         </div>
       </motion.div>

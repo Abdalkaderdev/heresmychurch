@@ -827,7 +827,7 @@ function HeaderPill({
             </span>{" "}
             across{" "}
             <span className="text-purple-300 font-medium">
-              {allStatesLoaded ? "50 states" : `${populatedCount} states`}
+              {allStatesLoaded ? "23 countries" : `${populatedCount} countries`}
             </span>
           </span>
         )}

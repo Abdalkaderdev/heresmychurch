@@ -494,8 +494,8 @@ function MainCampusSearch({
           const tierLabel = r._tier === 0
             ? `In ${STATE_NAMES[stateNorm] || stateNorm}`
             : r._tier === 1
-              ? "Nearby states"
-              : "Other states";
+              ? "Nearby countries"
+              : "Other countries";
           const hasAddress = r.address?.trim();
           const locationLine = hasAddress
             ? [r.address, r.city, r.state].filter(Boolean).join(", ")

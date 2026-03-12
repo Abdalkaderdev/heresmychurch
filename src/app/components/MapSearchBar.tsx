@@ -51,7 +51,7 @@ export function MapSearchBar({
   onAddChurchForState,
   detectedState,
   zoom = 1,
-  center = [-96, 38],
+  center = [40, 28],
 }: MapSearchBarProps) {
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -483,7 +483,7 @@ export function MapSearchBar({
                 <div className="px-4 py-4 text-center">
                   <p className="text-xs text-white/40">
                     {!hasPopulated
-                      ? "Explore a state first to enable search"
+                      ? "Explore a country first to enable search"
                       : <>No churches found for &ldquo;{query}&rdquo;</>}
                   </p>
                   {hasPopulated && (onAddChurch || (stateFilter && onAddChurchForState)) && (
@@ -575,7 +575,7 @@ export function MapSearchBar({
             }`}
           >
             {stateFilter && <StateFlag abbrev={stateFilter} size="sm" />}
-            {stateFilter ? stateFilter : "State"}
+            {stateFilter ? stateFilter : "Country"}
             <ChevronDown size={10} className={`transition-transform ${showStateDropdown ? "rotate-180" : ""}`} />
           </button>
         )}
