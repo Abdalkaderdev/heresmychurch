@@ -254,9 +254,18 @@ async function fetchCh(st:string):Promise<any[]>{
   const iso=`US-${st.toUpperCase()}`,b=B[st.toUpperCase()];
   if(BIG.has(st.toUpperCase())&&b){
     const qs=splitB(b);const seen=new Set<string>();let all:any[]=[];
+    const failed:number[]=[];
     for(let i=0;i<qs.length;i++){
-      try{const els=await ovpQ(bQ(iso,qs[i]),`${st}-Q${i+1}`);for(const c of parse(els,st)){if(!seen.has(c.id)){seen.add(c.id);all.push(c);}}}catch(e){console.log(`Q${i+1} fail:${e}`);}
+      try{const els=await ovpQ(bQ(iso,qs[i]),`${st}-Q${i+1}`);for(const c of parse(els,st)){if(!seen.has(c.id)){seen.add(c.id);all.push(c);}}}catch(e){console.log(`Q${i+1} fail:${e}`);failed.push(i);}
       if(i<qs.length-1)await new Promise(r=>setTimeout(r,500));
+    }
+    if(failed.length>0){
+      console.log(`[${st}] Retrying ${failed.length} failed quadrant(s): ${failed.map(i=>`Q${i+1}`).join(",")}`);
+      await new Promise(r=>setTimeout(r,3000));
+      for(const i of failed){
+        try{const els=await ovpQ(bQ(iso,qs[i]),`${st}-Q${i+1}-retry`);for(const c of parse(els,st)){if(!seen.has(c.id)){seen.add(c.id);all.push(c);}}}catch(e){console.log(`Q${i+1} retry fail:${e}`);}
+        await new Promise(r=>setTimeout(r,1000));
+      }
     }
     return all;
   }
