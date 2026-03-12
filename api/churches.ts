@@ -1101,6 +1101,109 @@ async function handleGetReactionsBulk(req: VercelRequest, res: VercelResponse) {
 }
 
 // ============================================================================
+// Presence Handlers (real-time "X people viewing")
+// ============================================================================
+
+const PRESENCE_TTL_SECONDS = 45; // Session expires after 45 seconds without heartbeat
+
+interface PresenceData {
+  sessions: Record<string, number>; // sessionHash -> lastSeen timestamp
+}
+
+async function handlePresenceHeartbeat(req: VercelRequest, res: VercelResponse, churchId: string) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const userIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+    const userAgent = (req.headers['user-agent'] || '').slice(0, 50);
+    // Create a session hash that's unique per browser tab (include random from body if provided)
+    const tabId = req.body?.tabId || '';
+    const sessionHash = hashIp(`${userIp}-${userAgent}-${tabId}`);
+
+    const presenceKey = `presence:${churchId}`;
+    const now = Date.now();
+    const cutoff = now - (PRESENCE_TTL_SECONDS * 1000);
+
+    // Get existing presence data
+    const data = (await kv.get<PresenceData>(presenceKey)) || { sessions: {} };
+
+    // Clean up expired sessions and add/update current session
+    const activeSessions: Record<string, number> = {};
+    for (const [hash, lastSeen] of Object.entries(data.sessions)) {
+      if (lastSeen > cutoff) {
+        activeSessions[hash] = lastSeen;
+      }
+    }
+    activeSessions[sessionHash] = now;
+
+    // Save with TTL slightly longer than session expiry
+    await kv.set(presenceKey, { sessions: activeSessions }, { ex: PRESENCE_TTL_SECONDS + 30 });
+
+    const viewerCount = Object.keys(activeSessions).length;
+
+    return res.status(200).json({
+      churchId,
+      viewers: viewerCount,
+      yourSession: sessionHash.slice(0, 8),
+    });
+  } catch (e) {
+    console.error('Error updating presence:', e);
+    return res.status(500).json({ error: String(e) });
+  }
+}
+
+async function handlePresenceGet(req: VercelRequest, res: VercelResponse, churchId: string) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const presenceKey = `presence:${churchId}`;
+    const now = Date.now();
+    const cutoff = now - (PRESENCE_TTL_SECONDS * 1000);
+
+    const data = await kv.get<PresenceData>(presenceKey);
+
+    if (!data) {
+      return res.status(200).json({ churchId, viewers: 0 });
+    }
+
+    // Count only active sessions
+    const activeCount = Object.values(data.sessions).filter(lastSeen => lastSeen > cutoff).length;
+
+    return res.status(200).json({
+      churchId,
+      viewers: activeCount,
+    });
+  } catch (e) {
+    console.error('Error getting presence:', e);
+    return res.status(500).json({ error: String(e) });
+  }
+}
+
+async function handlePresenceLeave(req: VercelRequest, res: VercelResponse, churchId: string) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const userIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+    const userAgent = (req.headers['user-agent'] || '').slice(0, 50);
+    const tabId = req.body?.tabId || '';
+    const sessionHash = hashIp(`${userIp}-${userAgent}-${tabId}`);
+
+    const presenceKey = `presence:${churchId}`;
+    const data = await kv.get<PresenceData>(presenceKey);
+
+    if (data && data.sessions[sessionHash]) {
+      delete data.sessions[sessionHash];
+      await kv.set(presenceKey, data, { ex: PRESENCE_TTL_SECONDS + 30 });
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (e) {
+    console.error('Error removing presence:', e);
+    return res.status(500).json({ error: String(e) });
+  }
+}
+
+// ============================================================================
 // Main Router
 // ============================================================================
 
@@ -1125,6 +1228,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path[0] === 'reactions' && path[1] === 'bulk') return handleGetReactionsBulk(req, res);
     if (path[0] === 'reactions' && path.length === 2) return handleGetReactions(req, res, path[1]);
     if (path[0] === 'react' && path.length === 2) return handleSubmitReaction(req, res, path[1]);
+
+    // Presence routes (real-time viewers)
+    if (path[0] === 'presence' && path[1] === 'heartbeat' && path.length === 3) return handlePresenceHeartbeat(req, res, path[2]);
+    if (path[0] === 'presence' && path[1] === 'leave' && path.length === 3) return handlePresenceLeave(req, res, path[2]);
+    if (path[0] === 'presence' && path.length === 2) return handlePresenceGet(req, res, path[1]);
 
     if (path.length === 1 && !['states', 'search', 'add', 'populate', 'pending', 'verify', 'confirm', 'denominations'].includes(path[0])) {
       return handleGetByState(req, res, path[0]);

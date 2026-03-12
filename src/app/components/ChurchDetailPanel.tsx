@@ -31,7 +31,7 @@ import { groupServiceTimesByDay, parseServiceTimesForDisplay } from "./ServiceTi
 import { formatFullAddress } from "./AddressInput";
 import { formatPhoneDisplay } from "./ui/utils";
 import { withSiteRef } from "./url-utils";
-import { confirmChurchData, fetchCorrectionHistory, fetchReactions, submitReaction } from "./api";
+import { confirmChurchData, fetchCorrectionHistory, fetchReactions, submitReaction, presenceHeartbeat, presenceLeave } from "./api";
 import type { CorrectionHistoryEntry, ReactionType, ReactionCounts } from "./api";
 
 /** Church or minimal summary for cross-state main campus link; both have state and shortId for navigation. */
@@ -262,6 +262,7 @@ export function ChurchDetailPanel({
   const [reactionSubmitting, setReactionSubmitting] = useState(false);
   const [reactionError, setReactionError] = useState(false);
   const hasSubmittedReaction = useRef(false);
+  const [viewerCount, setViewerCount] = useState(0);
   const sizeCat = getSizeCategory(church.attendance);
   const denomGroup = getDenominationGroup(church.denomination);
   const bilingualInfo = estimateBilingualProbability(church);
@@ -376,6 +377,33 @@ export function ChurchDetailPanel({
       .finally(() => setReactionsLoading(false));
   }, [church.id]);
 
+  // Presence heartbeat - polls every 30 seconds to show "X people viewing"
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const churchId = church.id;
+
+    const sendHeartbeat = async () => {
+      try {
+        const data = await presenceHeartbeat(churchId);
+        setViewerCount(data.viewers);
+      } catch (err) {
+        console.error("Presence heartbeat failed:", err);
+      }
+    };
+
+    // Send initial heartbeat immediately
+    sendHeartbeat();
+
+    // Then poll every 30 seconds
+    intervalId = setInterval(sendHeartbeat, 30000);
+
+    // Cleanup: send leave signal and clear interval
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      presenceLeave(churchId);
+    };
+  }, [church.id]);
+
   const handleConfirmData = async () => {
     setConfirming(true);
     try {
@@ -451,6 +479,18 @@ export function ChurchDetailPanel({
             <h2 className="text-white font-semibold text-xl leading-tight line-clamp-2 text-pretty">
               {church.name}
             </h2>
+            {/* Real-time viewer indicator */}
+            {viewerCount > 0 && (
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                <span className="text-green-400/90 text-xs font-medium">
+                  {viewerCount === 1 ? "1 person viewing now" : `${viewerCount} people viewing now`}
+                </span>
+              </div>
+            )}
             {(church.homeCampusId || otherCampuses.length > 0 || fullAddress) && (
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 {church.homeCampusId && (

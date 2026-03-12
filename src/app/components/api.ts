@@ -605,6 +605,61 @@ export interface PopulationResponse {
   source: string;
 }
 
+// ── Presence (real-time viewers) ──
+
+export interface PresenceResponse {
+  churchId: string;
+  viewers: number;
+  yourSession?: string;
+}
+
+// Generate a unique tab ID that persists for this browser tab
+let tabId: string | null = null;
+function getTabId(): string {
+  if (!tabId) {
+    tabId = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+  }
+  return tabId;
+}
+
+export async function presenceHeartbeat(churchId: string): Promise<PresenceResponse> {
+  const res = await fetchWithRetry(
+    `${BASE_URL}/churches/presence/heartbeat/${encodeURIComponent(churchId)}`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ tabId: getTabId() }),
+    }
+  );
+  if (!res.ok) throw new Error(`Failed to update presence: ${res.status}`);
+  return res.json();
+}
+
+export async function presenceLeave(churchId: string): Promise<void> {
+  try {
+    await fetch(
+      `${BASE_URL}/churches/presence/leave/${encodeURIComponent(churchId)}`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ tabId: getTabId() }),
+        keepalive: true, // Important for beforeunload
+      }
+    );
+  } catch {
+    // Ignore errors on leave - best effort
+  }
+}
+
+export async function getPresence(churchId: string): Promise<PresenceResponse> {
+  const res = await fetchWithRetry(
+    `${BASE_URL}/churches/presence/${encodeURIComponent(churchId)}`,
+    { headers }
+  );
+  if (!res.ok) throw new Error(`Failed to get presence: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchStatePopulations(): Promise<PopulationResponse> {
   const res = await fetchWithRetry(`${BASE_URL}/population`, {
     headers,
