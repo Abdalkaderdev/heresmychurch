@@ -1,11 +1,10 @@
-import { projectId, publicAnonKey } from "/utils/supabase/info";
 import type { Church, StateInfo } from "./church-data";
 
-const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-283d8046`;
+// Use Vercel API routes (relative URLs)
+const BASE_URL = "/api";
 
 const headers = {
   "Content-Type": "application/json",
-  Authorization: `Bearer ${publicAnonKey}`,
 };
 
 // Fetch with timeout via AbortController

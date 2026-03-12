@@ -728,6 +728,28 @@ app.post(`${P}/admin/cleanup-dc`,async(c)=>{
   }catch(e){return c.json({error:`${e}`},500);}
 });
 
+// Reset all church data (clear US data for Middle East migration)
+app.post(`${P}/admin/reset-all`,async(c)=>{
+  try{
+    // Old US states to clear
+    const oldStates=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"];
+    let deleted=0;
+    for(const st of oldStates){
+      for(const prefix of ["churches:","churches:sidx:","calibration:","pending-churches:"]){
+        const k=`${prefix}${st}`;
+        if(await kv.get(k)){await kv.del(k);deleted++;}
+      }
+    }
+    // Reset meta
+    await kv.set("churches:meta",{stateCounts:{},lastUpdated:new Date().toISOString()});
+    // Reset community stats
+    await kv.set("community:stats",{totalCorrections:0,churchesImproved:0,totalConfirmations:0,lastUpdated:Date.now()});
+    // Clear state populations cache
+    await kv.del("state-populations-v1");
+    return c.json({message:`Reset complete. Cleared ${deleted} keys for ${oldStates.length} old states.`,deleted});
+  }catch(e){return c.json({error:`${e}`},500);}
+});
+
 app.post(`${P}/admin/cleanup-blocked-denominations`,async(c)=>{
   try{
     const meta=await kv.get("churches:meta");const sc:Record<string,number>={...(meta?.stateCounts||{})};
