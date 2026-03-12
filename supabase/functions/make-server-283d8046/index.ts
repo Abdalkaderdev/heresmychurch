@@ -301,6 +301,24 @@ function addShortIds(ch:any[],st:string):any[]{return ch.map((c:any)=>({...c,sho
 function buildIdx(ch:any[]){return ch.map((c:any)=>({id:c.id,n:c.name||"",c:c.city||"",d:c.denomination||"",a:c.attendance||0,ad:c.address||"",la:c.lat||0,lo:c.lng||0}));}
 async function writeIdx(st:string,ch:any[]){await kv.set(`churches:sidx:${st}`,buildIdx(ch));}
 
+// Preserve user/community-submitted fields when overwriting cache (populate force, refresh-attendance).
+const USER_FIELDS_TO_PRESERVE=["homeCampusId","serviceTimes","languages","ministries","pastorName","phone","email","lastVerified","buildingSqft"] as const;
+function mergeUserFieldsFromExisting(existingChurches:any[],newChurches:any[]):void{
+  if(!Array.isArray(existingChurches)||!existingChurches.length)return;
+  const oldById=new Map<string,any>();
+  for(const c of existingChurches)if(c&&c.id)oldById.set(c.id,c);
+  for(const c of newChurches){
+    if(!c||!c.id)continue;
+    const old=oldById.get(c.id);if(!old)continue;
+    for(const f of USER_FIELDS_TO_PRESERVE){
+      const v=old[f];
+      if(v===undefined)continue;
+      if(f==="buildingSqft"&&(c.buildingSqft!=null&&c.buildingSqft>0))continue;
+      (c as any)[f]=v;
+    }
+  }
+}
+
 // Relevance scoring: keep in sync with src/app/components/search-scoring.ts
 const PHRASE=1000,ALL_IN_NAME=500,NAME_STARTS=300,TOK_NAME=50,TOK_LOC=30;
 function scoreMatch(q:string,n:string,ci:string,ad:string):number{
@@ -567,6 +585,7 @@ app.post(`${P}/churches/populate/:state`,async(c)=>{
         }
       }
     }
+    if(force&&Array.isArray(ex)&&ex.length)mergeUserFieldsFromExisting(ex,ch);
     await kv.set(`churches:${st}`,ch);await writeIdx(st,ch);
     const meta=(await kv.get("churches:meta"))||{stateCounts:{}};meta.stateCounts[st]=ch.length;meta.lastUpdated=new Date().toISOString();await kv.set("churches:meta",meta);
     return c.json({message:`Populated ${ch.length} churches for ${info.n}`,count:ch.length,communityPreserved:communityCount,state:{abbrev:info.a,name:info.n,lat:info.la,lng:info.lo},ardaEnriched:en});
@@ -603,6 +622,8 @@ app.post(`${P}/admin/refresh-attendance`,async(c)=>{
       const info=gS(st);if(!info)continue;
       try{
         const ch=await fetchCh(st);enrichARDA(ch);applyStateScaling(ch,st);
+        const existing=await kv.get(`churches:${st}`);
+        if(Array.isArray(existing)&&existing.length)mergeUserFieldsFromExisting(existing,ch);
         await kv.set(`churches:${st}`,ch);await writeIdx(st,ch);
         if(meta){meta.stateCounts[st]=ch.length;meta.lastUpdated=new Date().toISOString();await kv.set("churches:meta",meta);}
         refreshed++;

@@ -173,7 +173,7 @@ export function SummaryPanel({
               className="w-full py-2.5 rounded-xl text-xs font-semibold text-white bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/15 transition-colors cursor-pointer flex items-center justify-center gap-2"
             >
               <ShieldCheck size={13} />
-              Review Pending Submissions
+              Churches Needing Review
             </button>
           )}
         </div>
