@@ -5,11 +5,11 @@
   "framework": "vite",
   "functions": {
     "api/**/*.ts": {
-      "maxDuration": 60,
-      "includeFiles": "api/lib/**"
+      "maxDuration": 60
     }
   },
   "rewrites": [
+    { "source": "/api/churches/:path*", "destination": "/api/churches?path=:path*" },
     { "source": "/:path((?!api/).*)", "destination": "/index.html" }
   ]
 }

@@ -989,8 +989,10 @@ async function handleDenominationsAll(req: VercelRequest, res: VercelResponse) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    // Parse path from query string (rewrite passes it as string like "states" or "populate/LB")
     const pathParam = req.query.path;
-    const path = Array.isArray(pathParam) ? pathParam : pathParam ? [pathParam] : [];
+    const pathStr = Array.isArray(pathParam) ? pathParam.join('/') : (pathParam || '');
+    const path = pathStr ? pathStr.split('/').filter(Boolean) : [];
     const route = path.join('/');
 
     if (route === 'states') return handleStates(req, res);
