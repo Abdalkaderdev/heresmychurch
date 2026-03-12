@@ -1,7 +1,7 @@
 import { kv } from '@vercel/kv';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ME, getCountry, POPULATIONS } from '../_lib/countries';
-import { fetchChurches } from '../_lib/overpass';
+import { ME, getCountry, POPULATIONS } from '../lib/countries';
+import { fetchChurches } from '../lib/overpass';
 
 // ============================================================================
 // Types

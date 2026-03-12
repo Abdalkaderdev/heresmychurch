@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)",
+      "Bash(git remote add:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(npx supabase --version)",
+      "Bash(set:*)",
+      "Bash(npx supabase functions deploy:*)",
+      "Bash(dir:*)",
+      "Bash(git add:*)",
+      "Bash(git restore:*)",
+      "Bash(npx vercel:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:heresmychurch-4xswu3lk6-abdalkader-alhamouds-projects.vercel.app)",
+      "Bash(for:*)",
+      "Bash(done)",
+      "WebFetch(domain:heresmychurch.abdalkader.dev)",
+      "Bash(curl:*)",
+      "WebSearch",
+      "Bash(printf:*)",
+      "Bash(yes:*)",
+      "Bash(npx @upstash/cli:*)",
+      "Bash(upstash:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node -e:*)",
+      "Bash(npm ls:*)",
+      "Bash(head:*)"
+    ]
+  }
+}

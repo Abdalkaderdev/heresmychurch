@@ -11,21 +11,21 @@ try {
 }
 
 try {
-  const countries = await import('./_lib/countries');
+  const countries = await import('./lib/countries');
   importStatus['countries'] = `ok - ${countries.ME.length} countries`;
 } catch (e) {
   importStatus['countries'] = String(e);
 }
 
 try {
-  const overpass = await import('./_lib/overpass');
+  const overpass = await import('./lib/overpass');
   importStatus['overpass'] = 'ok';
 } catch (e) {
   importStatus['overpass'] = String(e);
 }
 
 try {
-  const denominations = await import('./_lib/denominations');
+  const denominations = await import('./lib/denominations');
   importStatus['denominations'] = 'ok';
 } catch (e) {
   importStatus['denominations'] = String(e);
