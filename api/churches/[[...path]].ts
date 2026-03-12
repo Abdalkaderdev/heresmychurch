@@ -862,9 +862,10 @@ async function handleDenominationsAll(req: VercelRequest, res: VercelResponse) {
 // ============================================================================
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const pathParam = req.query.path;
-  const path = Array.isArray(pathParam) ? pathParam : pathParam ? [pathParam] : [];
-  const route = path.join('/');
+  try {
+    const pathParam = req.query.path;
+    const path = Array.isArray(pathParam) ? pathParam : pathParam ? [pathParam] : [];
+    const route = path.join('/');
 
   // GET /churches/states
   if (route === 'states') {
@@ -912,4 +913,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(404).json({ error: 'Not found', route });
+  } catch (error) {
+    console.error('Handler error:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+  }
 }
