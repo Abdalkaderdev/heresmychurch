@@ -61,6 +61,19 @@ export interface StatesResponse {
   populatedStates: number;
 }
 
+export interface FreshnessInfo {
+  state: string;
+  churchCount: number;
+  lastPopulated: number | null;
+  ageHours: number | null;
+  ageDays: number | null;
+  isStale: boolean;
+}
+
+export interface FreshnessResponse {
+  freshness: FreshnessInfo[];
+}
+
 export interface NationalReviewStateStats {
   total: number;
   needsReview: number;
@@ -135,6 +148,19 @@ export async function fetchStates(): Promise<StatesResponse> {
     states: Array.isArray(data.states) ? data.states : [],
     totalChurches: data.totalChurches ?? 0,
     populatedStates: data.populatedStates ?? 0,
+  };
+}
+
+export async function fetchFreshness(): Promise<FreshnessResponse> {
+  const res = await fetchWithRetry(`${BASE_URL}/churches/freshness`, { headers, timeoutMs: 15000 });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("Error fetching freshness:", text);
+    throw new Error(`Failed to fetch freshness: ${res.status}`);
+  }
+  const data = await res.json();
+  return {
+    freshness: Array.isArray(data.freshness) ? data.freshness : [],
   };
 }
 

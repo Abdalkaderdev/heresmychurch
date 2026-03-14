@@ -4,8 +4,10 @@ import {
   getDenominationGroup,
   estimateBilingualProbability,
   sizeCategories,
+  matchesServiceTimeFilter,
+  getServiceTimeSlots,
 } from "../church-data";
-import type { Church, StateInfo } from "../church-data";
+import type { Church, StateInfo, ServiceTimeSlot, TimeOfDay } from "../church-data";
 
 interface InterestingFact {
   icon: string;
@@ -29,6 +31,8 @@ export function useChurchFilters(
   states: StateInfo[],
   statePopulations: Record<string, number>,
   countyStats?: CountyStatsForSummary,
+  serviceTimeSlots?: Set<ServiceTimeSlot>,
+  timeOfDayFilter?: TimeOfDay | "all",
 ) {
   // Filter churches
   const filteredChurches = useMemo(() => {
@@ -36,6 +40,13 @@ export function useChurchFilters(
       const sizeCat = getSizeCategory(church.attendance);
       const denomGroup = getDenominationGroup(church.denomination);
       if (!activeSize.has(sizeCat.label) || !activeDenominations.has(denomGroup)) return false;
+
+      // Service time filter
+      if (serviceTimeSlots && serviceTimeSlots.size > 0) {
+        if (!matchesServiceTimeFilter(church.serviceTimes, serviceTimeSlots, timeOfDayFilter || "all")) {
+          return false;
+        }
+      }
 
       if (languageFilter !== "all") {
         const bilingual = estimateBilingualProbability(church);
@@ -51,7 +62,31 @@ export function useChurchFilters(
 
       return true;
     });
-  }, [churches, activeSize, activeDenominations, languageFilter]);
+  }, [churches, activeSize, activeDenominations, languageFilter, serviceTimeSlots, timeOfDayFilter]);
+
+  // Service time stats for filter panel
+  const serviceTimeStats = useMemo(() => {
+    const slotCounts: Record<ServiceTimeSlot, number> = {
+      sunday_morning: 0,
+      sunday_evening: 0,
+      friday: 0,
+      saturday: 0,
+      weekday: 0,
+    };
+    let withServiceTimes = 0;
+
+    churches.forEach((ch) => {
+      const slots = getServiceTimeSlots(ch.serviceTimes);
+      if (slots.length > 0) {
+        withServiceTimes++;
+        slots.forEach((slot) => {
+          slotCounts[slot]++;
+        });
+      }
+    });
+
+    return { slotCounts, withServiceTimes, total: churches.length };
+  }, [churches]);
 
   // Language/bilingual stats for filter panel
   const languageStats = useMemo(() => {
@@ -128,6 +163,7 @@ export function useChurchFilters(
     denomCounts,
     sizeCounts,
     summaryStats,
+    serviceTimeStats,
   };
 }
 

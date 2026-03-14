@@ -8,6 +8,27 @@
       "maxDuration": 60
     }
   },
+  "headers": [
+    {
+      "source": "/flags/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/(.*).svg",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/api/churches/:path*", "destination": "/api/churches?path=:path*" },
     { "source": "/api/suggestions/:path*", "destination": "/api/suggestions?path=:path*" },

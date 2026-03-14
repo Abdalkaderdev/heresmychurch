@@ -11,8 +11,13 @@ import {
   ShieldCheck,
   Check,
   Globe,
+  Bookmark,
+  X,
+  RefreshCw,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
+import type { FavoriteChurch } from "./hooks/useFavorites";
 import { useState, useEffect } from "react";
 import { sizeCategories } from "./church-data";
 import type { StateInfo } from "./church-data";
@@ -79,6 +84,30 @@ interface SummaryPanelProps {
   onShowAddChurch: () => void;
   onShowVerification?: () => void;
   countyStats?: CountyStatsForSummary | null;
+  favorites?: FavoriteChurch[];
+  onNavigateToFavorite?: (favorite: FavoriteChurch) => void;
+  onRemoveFavorite?: (churchId: string) => void;
+  lastPopulated?: number | null;
+  onRefreshData?: () => void;
+  isRefreshing?: boolean;
+}
+
+function formatLastUpdated(timestamp: number | null | undefined): string {
+  if (!timestamp) return "Unknown";
+  const diff = Date.now() - timestamp;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  if (days < 365) return `${Math.floor(days / 30)} months ago`;
+  return `${Math.floor(days / 365)} years ago`;
+}
+
+function isDataStale(timestamp: number | null | undefined): boolean {
+  if (!timestamp) return false;
+  const days = (Date.now() - timestamp) / (1000 * 60 * 60 * 24);
+  return days > 30;
 }
 
 export function SummaryPanel({
@@ -95,7 +124,14 @@ export function SummaryPanel({
   onShowAddChurch,
   onShowVerification,
   countyStats,
+  favorites = [],
+  onNavigateToFavorite,
+  onRemoveFavorite,
+  lastPopulated,
+  onRefreshData,
+  isRefreshing = false,
 }: SummaryPanelProps) {
+  const stale = isDataStale(lastPopulated);
   return (
     <motion.div
       initial={{ opacity: 0, y: -8, scale: 0.97 }}
@@ -123,6 +159,10 @@ export function SummaryPanel({
             churchCount={churches.length}
             statePopulation={statePopulations[focusedState!]}
             countyStats={countyStats ?? null}
+            lastPopulated={lastPopulated}
+            onRefreshData={onRefreshData}
+            isRefreshing={isRefreshing}
+            isStale={stale}
           />
         ) : (
           <NationalSummaryContent
@@ -130,6 +170,9 @@ export function SummaryPanel({
             totalChurches={totalChurches}
             allStatesLoaded={allStatesLoaded}
             onNavigateToState={onNavigateToState}
+            favorites={favorites}
+            onNavigateToFavorite={onNavigateToFavorite}
+            onRemoveFavorite={onRemoveFavorite}
           />
         )}
 
@@ -188,6 +231,10 @@ function StateSummaryContent({
   churchCount,
   statePopulation,
   countyStats,
+  lastPopulated,
+  onRefreshData,
+  isRefreshing = false,
+  isStale = false,
 }: {
   stats: StateSummaryData;
   focusedState: string;
@@ -195,6 +242,10 @@ function StateSummaryContent({
   churchCount: number;
   statePopulation?: number;
   countyStats?: CountyStatsForSummary | null;
+  lastPopulated?: number | null;
+  onRefreshData?: () => void;
+  isRefreshing?: boolean;
+  isStale?: boolean;
 }) {
   return (
     <>
@@ -206,6 +257,39 @@ function StateSummaryContent({
           <> That&apos;s roughly <span className="font-medium text-white">1 church per {Math.round(statePopulation / churchCount).toLocaleString()} people</span>.</>
         )}
       </p>
+
+      {/* Data freshness indicator */}
+      {lastPopulated && (
+        <div className={`rounded-lg px-3 py-2.5 flex items-center justify-between ${
+          isStale ? "bg-amber-500/10 border border-amber-500/20" : "bg-white/[0.03] border border-white/5"
+        }`}>
+          <div className="flex items-center gap-2">
+            {isStale && <AlertTriangle size={12} className="text-amber-400 flex-shrink-0" />}
+            <div>
+              <span className={`text-[10px] uppercase tracking-wider font-semibold block ${isStale ? "text-amber-400/70" : "text-white/40"}`}>
+                Last updated
+              </span>
+              <span className={`text-xs ${isStale ? "text-amber-300" : "text-white/70"}`}>
+                {formatLastUpdated(lastPopulated)}
+              </span>
+            </div>
+          </div>
+          {onRefreshData && (
+            <button
+              onClick={onRefreshData}
+              disabled={isRefreshing}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                isStale
+                  ? "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
+                  : "bg-purple-500/15 text-purple-300 hover:bg-purple-500/25"
+              } disabled:opacity-50`}
+            >
+              <RefreshCw size={12} className={isRefreshing ? "animate-spin" : ""} />
+              {isRefreshing ? "Refreshing..." : "Refresh"}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Community impact (state-scoped) */}
       <CommunityStatsCard key={focusedState} stateAbbrev={focusedState} />
@@ -294,11 +378,17 @@ function NationalSummaryContent({
   totalChurches,
   allStatesLoaded,
   onNavigateToState,
+  favorites = [],
+  onNavigateToFavorite,
+  onRemoveFavorite,
 }: {
   stats: NationalSummaryData;
   totalChurches: number;
   allStatesLoaded: boolean;
   onNavigateToState: (abbrev: string) => void;
+  favorites?: FavoriteChurch[];
+  onNavigateToFavorite?: (favorite: FavoriteChurch) => void;
+  onRemoveFavorite?: (churchId: string) => void;
 }) {
   return (
     <>
@@ -352,6 +442,56 @@ function NationalSummaryContent({
 
       {/* Interesting facts */}
       <FactsList facts={stats.interestingFacts} onNavigateToState={onNavigateToState} />
+
+      {/* Saved churches (favorites) */}
+      {favorites.length > 0 && onNavigateToFavorite && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Bookmark size={12} className="text-amber-400 flex-shrink-0" />
+            <span className="text-[10px] uppercase tracking-widest text-amber-400/70 font-medium">
+              My Saved Churches
+            </span>
+            <span className="text-[10px] text-white/30 ml-auto">{favorites.length}</span>
+          </div>
+          <div className="space-y-1">
+            {favorites.slice(0, 5).map((fav) => (
+              <div
+                key={fav.id}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/10 group"
+              >
+                <button
+                  onClick={() => onNavigateToFavorite(fav)}
+                  className="flex-1 flex items-center gap-2 min-w-0 text-left"
+                >
+                  <StateFlag abbrev={fav.state} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-white text-xs font-medium truncate block group-hover:text-amber-300 transition-colors">
+                      {fav.name}
+                    </span>
+                    <span className="text-white/40 text-[10px] truncate block">
+                      {fav.city ? `${fav.city}, ${fav.state}` : fav.state}
+                    </span>
+                  </div>
+                </button>
+                {onRemoveFavorite && (
+                  <button
+                    onClick={() => onRemoveFavorite(fav.id)}
+                    className="p-1 rounded-md hover:bg-white/10 transition-colors flex-shrink-0"
+                    title="Remove from saved"
+                  >
+                    <X size={12} className="text-white/40 hover:text-white/60" />
+                  </button>
+                )}
+              </div>
+            ))}
+            {favorites.length > 5 && (
+              <p className="text-white/30 text-[10px] text-center pt-1">
+                +{favorites.length - 5} more saved
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Unloaded countries hint */}
       {stats.unpopulated > 0 && (

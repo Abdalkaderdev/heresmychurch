@@ -1,5 +1,5 @@
 import type { Church, HomeCampusSummary } from "./church-data";
-import { getSizeCategory, getDenominationGroup, estimateBilingualProbability, getFallbackLocation } from "./church-data";
+import { getSizeCategory, getDenominationGroup, estimateBilingualProbability, getFallbackLocation, getPotentialDuplicates } from "./church-data";
 import {
   Church as ChurchIcon,
   Users,
@@ -22,7 +22,10 @@ import {
   ThumbsUp,
   Building2,
   Home,
+  Bookmark,
+  AlertTriangle,
 } from "lucide-react";
+import { ShareButton } from "./ShareButton";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { motion } from "motion/react";
 import { SuggestEditForm } from "./SuggestEditForm";
@@ -45,6 +48,8 @@ interface ChurchDetailPanelProps {
   externalShowEditForm?: boolean;
   onEditFormClosed?: () => void;
   onChurchUpdated?: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
 function formatTimeAgo(ts: number): string {
@@ -248,6 +253,8 @@ export function ChurchDetailPanel({
   externalShowEditForm,
   onEditFormClosed,
   onChurchUpdated,
+  isFavorite = false,
+  onToggleFavorite,
 }: ChurchDetailPanelProps) {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -297,6 +304,11 @@ export function ChurchDetailPanel({
       }))
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 5);
+  }, [church, allChurches]);
+
+  // Check for potential duplicates
+  const potentialDuplicates = useMemo(() => {
+    return getPotentialDuplicates(church, allChurches);
   }, [church, allChurches]);
 
   // Same denomination churches nearby
@@ -519,7 +531,7 @@ export function ChurchDetailPanel({
         </div>
 
         {/* Quick action buttons */}
-        <div className="flex gap-2 mt-3">
+        <div className="flex flex-wrap gap-2 mt-3">
           <a
             href={googleMapsUrl}
             target="_blank"
@@ -558,11 +570,62 @@ export function ChurchDetailPanel({
               Find Website
             </a>
           )}
+          <ShareButton church={church} />
+          {onToggleFavorite && (
+            <button
+              onClick={onToggleFavorite}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-colors ${
+                isFavorite
+                  ? "text-amber-400 bg-amber-500/20 hover:bg-amber-500/30"
+                  : "text-white/70 bg-white/8 hover:bg-white/12"
+              }`}
+              style={{ boxShadow: "inset 0 1px 0 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 0 rgba(0, 0, 0, 0.1)" }}
+              title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+            >
+              <Bookmark size={14} className={isFavorite ? "fill-current" : ""} />
+              {isFavorite ? "Saved" : "Save"}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Scrollable content */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        {/* Duplicate warning */}
+        {potentialDuplicates.length > 0 && (
+          <div className="rounded-xl p-3 bg-amber-500/10 border border-amber-500/20">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <span className="text-xs uppercase tracking-wider text-amber-400/80 font-semibold block mb-1">
+                  Potential Duplicate
+                </span>
+                <p className="text-white/60 text-xs leading-relaxed mb-2">
+                  This church may be a duplicate of another listing. Similar churches nearby:
+                </p>
+                <div className="space-y-1">
+                  {potentialDuplicates.slice(0, 2).map((dup) => (
+                    <button
+                      key={dup.church.id}
+                      onClick={() => onChurchClick(dup.church)}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-left"
+                    >
+                      <span className="text-white/80 text-xs truncate flex-1">{dup.church.name}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                        dup.confidence === "high"
+                          ? "bg-red-500/20 text-red-400"
+                          : "bg-amber-500/20 text-amber-400"
+                      }`}>
+                        {Math.round(dup.nameSimilarity * 100)}% match
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Reaction bar (Netflix-style thumbs) — above service times */}
         {!reactionsLoading && (
           <div className="flex flex-col gap-2">

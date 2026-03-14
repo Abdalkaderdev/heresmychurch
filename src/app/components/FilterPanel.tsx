@@ -2,11 +2,13 @@ import {
   ChevronUp,
   ChevronDown,
   Languages,
+  Clock,
 } from "lucide-react";
 import {
   sizeCategories,
   DENOMINATION_GROUPS,
 } from "./church-data";
+import type { ServiceTimeSlot, TimeOfDay } from "./church-data";
 import { CloseButton } from "./ui/close-button";
 
 interface FilterPanelProps {
@@ -31,6 +33,18 @@ interface FilterPanelProps {
     sortedLangs: { lang: string; total: number; confirmed: number; estimated: number }[];
   };
   churchCount: number;
+  // Service times
+  serviceTimeSlots?: Set<ServiceTimeSlot>;
+  toggleServiceTimeSlot?: (slot: ServiceTimeSlot) => void;
+  timeOfDayFilter?: TimeOfDay | "all";
+  setTimeOfDayFilter?: (v: TimeOfDay | "all") => void;
+  showServiceTimeFilters?: boolean;
+  setShowServiceTimeFilters?: (v: boolean) => void;
+  serviceTimeStats?: {
+    slotCounts: Record<ServiceTimeSlot, number>;
+    withServiceTimes: number;
+    total: number;
+  };
   // Actions
   onClose: () => void;
 }
@@ -51,8 +65,16 @@ export function FilterPanel({
   setShowLanguageFilters,
   languageStats,
   churchCount,
+  serviceTimeSlots,
+  toggleServiceTimeSlot,
+  timeOfDayFilter,
+  setTimeOfDayFilter,
+  showServiceTimeFilters,
+  setShowServiceTimeFilters,
+  serviceTimeStats,
   onClose,
 }: FilterPanelProps) {
+  const hasServiceTimeFilter = serviceTimeSlots && serviceTimeSlots.size > 0;
   return (
     <div
       className="absolute left-[58px] bottom-6 z-[35] rounded-xl shadow-2xl p-4 w-[260px] max-h-[70vh] overflow-y-auto"
@@ -139,6 +161,36 @@ export function FilterPanel({
           languageStats={languageStats}
           churchCount={churchCount}
         />
+      )}
+
+      {/* Service time filters */}
+      {toggleServiceTimeSlot && setShowServiceTimeFilters && (
+        <>
+          <button
+            onClick={() => setShowServiceTimeFilters(!showServiceTimeFilters)}
+            className="w-full flex items-center justify-between py-2 text-xs font-semibold text-purple-300 uppercase tracking-wider border-t border-white/10"
+          >
+            <span className="flex items-center gap-1.5">
+              <Clock size={12} />
+              Service Times
+              {hasServiceTimeFilter && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 font-medium normal-case tracking-normal">
+                  active
+                </span>
+              )}
+            </span>
+            {showServiceTimeFilters ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+          {showServiceTimeFilters && serviceTimeSlots && serviceTimeStats && setTimeOfDayFilter && (
+            <ServiceTimeFilters
+              activeSlots={serviceTimeSlots}
+              toggleSlot={toggleServiceTimeSlot}
+              timeOfDay={timeOfDayFilter || "all"}
+              setTimeOfDay={setTimeOfDayFilter}
+              stats={serviceTimeStats}
+            />
+          )}
+        </>
       )}
     </div>
   );
@@ -289,6 +341,118 @@ function LanguageFilters({
       {languageFilter !== "all" && (
         <button
           onClick={() => setLanguageFilter("all")}
+          className="text-xs text-purple-300 hover:text-purple-200 px-2 mt-1"
+        >
+          Clear filter
+        </button>
+      )}
+    </div>
+  );
+}
+
+const SERVICE_TIME_SLOTS: { slot: ServiceTimeSlot; label: string; description: string }[] = [
+  { slot: "sunday_morning", label: "Sunday Morning", description: "Before noon on Sunday" },
+  { slot: "sunday_evening", label: "Sunday Evening", description: "After 5pm on Sunday" },
+  { slot: "friday", label: "Friday", description: "Any service on Friday" },
+  { slot: "saturday", label: "Saturday", description: "Any service on Saturday" },
+  { slot: "weekday", label: "Weekday", description: "Monday through Thursday" },
+];
+
+const TIME_OF_DAY_OPTIONS: { value: TimeOfDay | "all"; label: string }[] = [
+  { value: "all", label: "Any time" },
+  { value: "morning", label: "Morning (before 12pm)" },
+  { value: "afternoon", label: "Afternoon (12-5pm)" },
+  { value: "evening", label: "Evening (after 5pm)" },
+];
+
+function ServiceTimeFilters({
+  activeSlots,
+  toggleSlot,
+  timeOfDay,
+  setTimeOfDay,
+  stats,
+}: {
+  activeSlots: Set<ServiceTimeSlot>;
+  toggleSlot: (slot: ServiceTimeSlot) => void;
+  timeOfDay: TimeOfDay | "all";
+  setTimeOfDay: (v: TimeOfDay | "all") => void;
+  stats: {
+    slotCounts: Record<ServiceTimeSlot, number>;
+    withServiceTimes: number;
+    total: number;
+  };
+}) {
+  const hasAnyFilter = activeSlots.size > 0;
+
+  return (
+    <div className="mb-2 space-y-2">
+      {/* Info about service time data availability */}
+      <div className="px-2 py-1.5 rounded-md bg-white/[0.03]">
+        <p className="text-[10px] text-white/40">
+          {stats.withServiceTimes} of {stats.total} churches have service times
+        </p>
+      </div>
+
+      {/* Day/slot checkboxes */}
+      <div className="space-y-0.5">
+        {SERVICE_TIME_SLOTS.map(({ slot, label, description }) => {
+          const count = stats.slotCounts[slot];
+          return (
+            <label
+              key={slot}
+              className="flex items-center gap-2.5 py-1.5 cursor-pointer hover:bg-white/5 px-2 rounded-md"
+              title={description}
+            >
+              <input
+                type="checkbox"
+                checked={activeSlots.has(slot)}
+                onChange={() => toggleSlot(slot)}
+                className="accent-green-500 w-3.5 h-3.5"
+              />
+              <span className="text-xs text-white/70 flex-1">{label}</span>
+              {count > 0 && (
+                <span className="text-xs text-white/30 tabular-nums">{count}</span>
+              )}
+            </label>
+          );
+        })}
+      </div>
+
+      {/* Time of day filter */}
+      {hasAnyFilter && (
+        <>
+          <div className="h-px bg-white/5 mx-2" />
+          <p className="text-[9px] text-white/25 px-2 uppercase tracking-wider font-semibold">
+            Time of day
+          </p>
+          <div className="space-y-0.5">
+            {TIME_OF_DAY_OPTIONS.map(({ value, label }) => (
+              <label
+                key={value}
+                className="flex items-center gap-2.5 py-1 cursor-pointer hover:bg-white/5 px-2 rounded-md"
+              >
+                <input
+                  type="radio"
+                  name="timeOfDay"
+                  checked={timeOfDay === value}
+                  onChange={() => setTimeOfDay(value)}
+                  className="accent-green-500 w-3.5 h-3.5"
+                />
+                <span className="text-xs text-white/70">{label}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+
+      {hasAnyFilter && (
+        <button
+          onClick={() => {
+            SERVICE_TIME_SLOTS.forEach(({ slot }) => {
+              if (activeSlots.has(slot)) toggleSlot(slot);
+            });
+            setTimeOfDay("all");
+          }}
           className="text-xs text-purple-300 hover:text-purple-200 px-2 mt-1"
         >
           Clear filter

@@ -92,6 +92,7 @@ const POPULATIONS: Record<string, number> = {
 type DenomRule = [string, string[]?, string?, string[]?];
 
 const DENOM_RULES: DenomRule[] = [
+  // Orthodox Churches
   ["Coptic Orthodox", ["coptic orthodox", "coptic_orthodox"]],
   ["Coptic Orthodox", , "\\b(coptic|قبطي)\\b", ["catholic"]],
   ["Greek Orthodox", ["greek orthodox", "greek_orthodox", "rum orthodox"]],
@@ -102,29 +103,62 @@ const DENOM_RULES: DenomRule[] = [
   ["Antiochian Orthodox", ["antiochian", "antioch orthodox"]],
   ["Ethiopian Orthodox", ["ethiopian orthodox", "ethiopian_orthodox"]],
   ["Eritrean Orthodox", ["eritrean orthodox", "eritrean_orthodox"]],
+  // Orthodox name patterns with explicit "orthodox" in name (Arabic)
+  ["Orthodox", , "\\b(st\\.?\\s+(nicholas|george|mary|marina))\\b.*(orthodox|ορθόδοξ|أرثوذكس)", []],
   ["Orthodox", ["orthodox"]],
+
+  // Eastern Catholic Churches
   ["Maronite Catholic", ["maronite"]],
   ["Melkite Catholic", ["melkite", "melkite greek catholic"]],
   ["Chaldean Catholic", ["chaldean"]],
   ["Coptic Catholic", ["coptic catholic"]],
   ["Armenian Catholic", ["armenian catholic"]],
   ["Syriac Catholic", ["syriac catholic", "syrian catholic"]],
+
+  // Latin Catholic - explicit tags
   ["Catholic", ["catholic", "roman_catholic"]],
-  ["Catholic", , "\\b(parish|basilica|sacred heart|immaculate|our lady|blessed sacrament|holy (family|cross|spirit|trinity|rosary|name|redeemer))\\b", ["orthodox", "maronite", "melkite", "chaldean", "coptic", "armenian", "syriac"]],
+
+  // Catholic - saint name patterns (common Catholic naming)
+  ["Catholic", , "\\b(st\\.?\\s+(mary|joseph|peter|paul|john|james|michael|george|anthony|francis|anne|teresa|patrick|thomas|andrew|christopher|barbara|catherine|elizabeth|helen|margaret|stephen|dominic|ignatius))\\b", ["orthodox", "maronite", "melkite", "chaldean", "coptic", "armenian", "syriac"]],
+
+  // Catholic - common church naming patterns
+  ["Catholic", , "\\b(parish|basilica|cathedral|sacred heart|immaculate|our lady|blessed sacrament|holy (family|cross|spirit|trinity|rosary|name|redeemer)|notre dame)\\b", ["orthodox", "maronite", "melkite", "chaldean", "coptic", "armenian", "syriac"]],
+
+  // Catholic - operator/network patterns
+  ["Catholic", , "\\b(archdiocese|diocese|parish of|roman catholic)\\b", ["orthodox"]],
+
+  // Arabic Catholic patterns
+  ["Catholic", , "(كاثوليك|الكنيسة الكاثوليكية|كنيسة كاثوليكية)", []],
+
+  // Coptic Arabic patterns (for churches without explicit coptic tag)
+  ["Coptic Orthodox", , "(كنيسة قبطية|مارجرجس|مار مرقس|الكنيسة القبطية)", []],
+
+  // Assyrian Church
   ["Assyrian Church of the East", ["assyrian church", "church of the east"]],
   ["Assyrian Church of the East", , "\\bassyrian\\b", ["catholic"]],
+
+  // Anglican/Episcopal
   ["Anglican", ["anglican", "episcopal", "church of england"]],
+  ["Anglican", , "\\b(episcopal diocese|church of england|anglican communion)\\b", []],
+
+  // Mainline Protestant
   ["Lutheran", ["lutheran"]],
   ["Presbyterian", ["presbyterian"]],
   ["Methodist", ["methodist", "wesleyan"]],
   ["Baptist", ["baptist"]],
+
+  // Pentecostal/Charismatic
   ["Assemblies of God", ["assemblies of god", "assembly of god"]],
   ["Pentecostal", ["pentecostal", "foursquare", "full gospel"]],
   ["Evangelical", ["evangelical", "bible church"]],
+
+  // Other denominations
   ["Seventh-day Adventist", ["seventh", "adventist", "sda"]],
+  ["Salvation Army", ["salvation army"]],
+
+  // Non-denominational (should be last to catch remaining)
   ["Non-denominational", ["nondenominational", "non-denominational", "community church", "international church", "fellowship"]],
   ["Non-denominational", , "\\b(international|expat|fellowship|worship center)\\b"],
-  ["Salvation Army", ["salvation army"]],
 ];
 
 interface CompiledRule {
@@ -548,12 +582,77 @@ function extractStateFromId(churchId: string): string | null {
 // Route Handlers
 // ============================================================================
 
+interface ChurchesMeta {
+  stateCounts: Record<string, number>;
+  lastPopulated: Record<string, number>; // timestamp per country
+}
+
+// Search index structure for faster search
+interface SearchableChurch {
+  id: string;
+  shortId?: string;
+  name: string;
+  city: string;
+  state: string;
+  denomination: string;
+  lat: number;
+  lng: number;
+  attendance: number;
+  address?: string;
+}
+
+interface SearchIndex {
+  terms: Record<string, string[]>; // term -> church IDs
+  churches: Record<string, SearchableChurch>; // id -> minimal church data
+}
+
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length >= 2);
+}
+
+function buildSearchIndex(churches: Church[], state: string): SearchIndex {
+  const index: SearchIndex = { terms: {}, churches: {} };
+
+  for (const church of churches) {
+    const tokens = tokenize(
+      [church.name, church.city, church.denomination, church.address].filter(Boolean).join(' ')
+    );
+
+    for (const token of tokens) {
+      if (!index.terms[token]) index.terms[token] = [];
+      if (!index.terms[token].includes(church.id)) {
+        index.terms[token].push(church.id);
+      }
+    }
+
+    index.churches[church.id] = {
+      id: church.id,
+      shortId: church.shortId,
+      name: church.name,
+      city: church.city || '',
+      state,
+      denomination: church.denomination || '',
+      lat: church.lat,
+      lng: church.lng,
+      attendance: church.attendance || 0,
+      address: church.address,
+    };
+  }
+
+  return index;
+}
+
 async function handleStates(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const meta = (await kv.get<{ stateCounts: Record<string, number> }>('churches:meta')) || { stateCounts: {} };
+    const meta = (await kv.get<ChurchesMeta>('churches:meta')) || { stateCounts: {}, lastPopulated: {} };
     const sc = meta.stateCounts || {};
+    const lp = meta.lastPopulated || {};
 
     const states = ME.map((s) => ({
       abbrev: s.abbrev,
@@ -562,6 +661,7 @@ async function handleStates(req: VercelRequest, res: VercelResponse) {
       lng: s.lng,
       churchCount: sc[s.abbrev] || 0,
       isPopulated: !!sc[s.abbrev],
+      lastPopulated: lp[s.abbrev] || null,
     }));
 
     const totalChurches = Object.values(sc).reduce((a, b) => a + b, 0);
@@ -574,6 +674,38 @@ async function handleStates(req: VercelRequest, res: VercelResponse) {
   } catch (e) {
     console.error('Error fetching states:', e);
     return res.status(500).json({ states: [], totalChurches: 0, populatedStates: 0, error: String(e) });
+  }
+}
+
+async function handleFreshness(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const meta = (await kv.get<ChurchesMeta>('churches:meta')) || { stateCounts: {}, lastPopulated: {} };
+    const sc = meta.stateCounts || {};
+    const lp = meta.lastPopulated || {};
+    const now = Date.now();
+
+    const freshness = Object.keys(sc).map((state) => {
+      const lastPopulated = lp[state] || 0;
+      const ageMs = lastPopulated ? now - lastPopulated : Infinity;
+      const ageHours = lastPopulated ? Math.floor(ageMs / (1000 * 60 * 60)) : null;
+      const ageDays = lastPopulated ? Math.floor(ageMs / (1000 * 60 * 60 * 24)) : null;
+
+      return {
+        state,
+        churchCount: sc[state],
+        lastPopulated,
+        ageHours,
+        ageDays,
+        isStale: ageDays !== null && ageDays > 30, // Stale if > 30 days old
+      };
+    });
+
+    return res.status(200).json({ freshness });
+  } catch (e) {
+    console.error('Error fetching freshness:', e);
+    return res.status(500).json({ freshness: [], error: String(e) });
   }
 }
 
@@ -611,42 +743,91 @@ async function handleSearch(req: VercelRequest, res: VercelResponse) {
 
     const results: ScoredResult[] = [];
     let statesSearched = 0;
+    const queryTokens = tokenize(q);
 
     for (const state of statesToSearch) {
-      const churches = await kv.get<Church[]>(`churches:${state}`);
-      if (!churches || !Array.isArray(churches)) continue;
-      statesSearched++;
+      // Try to use search index for faster search
+      const index = await kv.get<SearchIndex>(`search:index:${state}`);
 
-      for (const church of churches) {
-        const name = church.name || '';
-        const city = church.city || '';
-        const address = church.address || '';
-        const denomination = church.denomination || '';
+      if (index && index.terms && index.churches) {
+        statesSearched++;
 
-        const tokens = q.split(/\s+/).filter(Boolean);
-        const hasMatch = tokens.some(
-          (token) =>
-            name.toLowerCase().includes(token) ||
-            city.toLowerCase().includes(token) ||
-            address.toLowerCase().includes(token) ||
-            denomination.toLowerCase().includes(token)
-        );
+        // Find church IDs that match any query token
+        const matchingIds = new Set<string>();
+        for (const token of queryTokens) {
+          // Exact token match
+          if (index.terms[token]) {
+            for (const id of index.terms[token]) {
+              matchingIds.add(id);
+            }
+          }
+          // Prefix match for partial queries
+          for (const indexToken of Object.keys(index.terms)) {
+            if (indexToken.startsWith(token) || indexToken.includes(token)) {
+              for (const id of index.terms[indexToken]) {
+                matchingIds.add(id);
+              }
+            }
+          }
+        }
 
-        if (hasMatch) {
-          const score = scoreMatch(q, name, city, address);
+        // Score and add matching churches
+        for (const id of matchingIds) {
+          const church = index.churches[id];
+          if (!church) continue;
+
+          const score = scoreMatch(q, church.name, church.city, church.address || '');
           results.push({
             id: church.id,
             shortId: church.shortId,
-            name,
-            city,
+            name: church.name,
+            city: church.city,
             state: church.state,
-            denomination,
-            attendance: church.attendance || 0,
+            denomination: church.denomination,
+            attendance: church.attendance,
             lat: church.lat,
             lng: church.lng,
-            address,
+            address: church.address || '',
             score,
           });
+        }
+      } else {
+        // Fallback to full scan if no index
+        const churches = await kv.get<Church[]>(`churches:${state}`);
+        if (!churches || !Array.isArray(churches)) continue;
+        statesSearched++;
+
+        for (const church of churches) {
+          const name = church.name || '';
+          const city = church.city || '';
+          const address = church.address || '';
+          const denomination = church.denomination || '';
+
+          const tokens = q.split(/\s+/).filter(Boolean);
+          const hasMatch = tokens.some(
+            (token) =>
+              name.toLowerCase().includes(token) ||
+              city.toLowerCase().includes(token) ||
+              address.toLowerCase().includes(token) ||
+              denomination.toLowerCase().includes(token)
+          );
+
+          if (hasMatch) {
+            const score = scoreMatch(q, name, city, address);
+            results.push({
+              id: church.id,
+              shortId: church.shortId,
+              name,
+              city,
+              state: church.state,
+              denomination,
+              attendance: church.attendance || 0,
+              lat: church.lat,
+              lng: church.lng,
+              address,
+              score,
+            });
+          }
         }
       }
 
@@ -703,6 +884,78 @@ async function handleGetByState(req: VercelRequest, res: VercelResponse, statePa
   }
 }
 
+// Reverse geocoding using Nominatim (free, rate-limited)
+interface NominatimResponse {
+  display_name?: string;
+  address?: {
+    city?: string;
+    town?: string;
+    village?: string;
+    municipality?: string;
+    county?: string;
+    state?: string;
+    country?: string;
+    road?: string;
+    house_number?: string;
+  };
+}
+
+async function reverseGeocode(lat: number, lng: number): Promise<{ city?: string; address?: string }> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'HereIsMyChurch/1.0 (https://heresmychurch.abdalkader.dev)',
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!res.ok) return {};
+
+    const data: NominatimResponse = await res.json();
+    const addr = data.address || {};
+
+    // Extract city from various address components
+    const city = addr.city || addr.town || addr.village || addr.municipality || '';
+
+    // Build a simple address from available components
+    const addressParts: string[] = [];
+    if (addr.house_number) addressParts.push(addr.house_number);
+    if (addr.road) addressParts.push(addr.road);
+    const address = addressParts.length > 0 ? addressParts.join(' ') : undefined;
+
+    return { city, address };
+  } catch (err) {
+    console.warn('Reverse geocoding failed:', err);
+    return {};
+  }
+}
+
+// Rate-limited geocoding - batches requests to respect Nominatim's 1 req/sec limit
+async function geocodeMissingAddresses(churches: Church[]): Promise<void> {
+  const needsGeocoding = churches.filter((c) => !c.city && c.lat && c.lng);
+
+  // Limit to 50 churches per populate to avoid timeouts
+  const toGeocode = needsGeocoding.slice(0, 50);
+
+  for (let i = 0; i < toGeocode.length; i++) {
+    const church = toGeocode[i];
+
+    // Wait 1 second between requests to respect rate limit
+    if (i > 0) {
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+
+    const geo = await reverseGeocode(church.lat, church.lng);
+    if (geo.city) {
+      church.city = geo.city;
+    }
+    if (geo.address && !church.address) {
+      church.address = geo.address;
+    }
+  }
+}
+
 async function handlePopulate(req: VercelRequest, res: VercelResponse, stateParam: string) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -738,11 +991,25 @@ async function handlePopulate(req: VercelRequest, res: VercelResponse, statePara
     }));
 
     applyStateScaling(churches, stateCode);
+
+    // Geocode missing addresses (rate-limited, up to 50 per populate)
+    // Only do this if explicitly requested to avoid slowing down population
+    const doGeocode = req.query.geocode === 'true';
+    if (doGeocode) {
+      await geocodeMissingAddresses(churches);
+    }
+
     await kv.set(churchesKey, churches);
 
-    const meta = (await kv.get<{ stateCounts: Record<string, number> }>('churches:meta')) || { stateCounts: {} };
+    // Build and store search index for this state
+    const searchIndex = buildSearchIndex(churches, stateCode);
+    await kv.set(`search:index:${stateCode}`, searchIndex);
+
+    const meta = (await kv.get<ChurchesMeta>('churches:meta')) || { stateCounts: {}, lastPopulated: {} };
     meta.stateCounts = meta.stateCounts || {};
+    meta.lastPopulated = meta.lastPopulated || {};
     meta.stateCounts[stateCode] = churches.length;
+    meta.lastPopulated[stateCode] = Date.now();
     await kv.set('churches:meta', meta);
 
     return res.status(200).json({
@@ -1314,6 +1581,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (route === 'add') return handleAdd(req, res);
     if (route === 'denominations/all') return handleDenominationsAll(req, res);
     if (route === 'review-stats') return handleReviewStats(req, res);
+    if (route === 'freshness') return handleFreshness(req, res);
     if (path[0] === 'populate' && path.length === 2) return handlePopulate(req, res, path[1]);
     if (path[0] === 'pending' && path.length === 2) return handleGetPending(req, res, path[1]);
     if (path[0] === 'verify' && path.length === 2) return handleVerify(req, res, path[1]);

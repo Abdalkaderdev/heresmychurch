@@ -47,6 +47,7 @@ export interface StateInfo {
   lng: number;
   churchCount: number;
   isPopulated: boolean;
+  lastPopulated?: number | null;
 }
 
 // ── Completeness tiers (tier 1 = critical for "needs review") ──
@@ -392,3 +393,274 @@ export const COMMON_MINISTRIES = [
   "Marriage & Family", "Counseling", "Prayer", "Discipleship",
   "Sports", "Media / Production", "Hospitality",
 ];
+
+// ── Service Time Filtering ──
+
+export type ServiceTimeSlot =
+  | "sunday_morning"
+  | "sunday_evening"
+  | "friday"
+  | "saturday"
+  | "weekday";
+
+export type TimeOfDay = "morning" | "afternoon" | "evening";
+
+export interface ParsedServiceTime {
+  day: "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday";
+  hour: number; // 0-23
+  minute: number;
+  timeOfDay: TimeOfDay;
+  label?: string;
+}
+
+const DAY_MAP: Record<string, ParsedServiceTime["day"]> = {
+  sun: "sunday",
+  mon: "monday",
+  tue: "tuesday",
+  wed: "wednesday",
+  thu: "thursday",
+  fri: "friday",
+  sat: "saturday",
+  sunday: "sunday",
+  monday: "monday",
+  tuesday: "tuesday",
+  wednesday: "wednesday",
+  thursday: "thursday",
+  friday: "friday",
+  saturday: "saturday",
+};
+
+function parseTimeToHours(time: string): { hour: number; minute: number } | null {
+  // Handle formats like "9:00 AM", "11:00", "7pm", "19:00"
+  const match = time.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)?/i);
+  if (!match) return null;
+
+  let hour = parseInt(match[1], 10);
+  const minute = match[2] ? parseInt(match[2], 10) : 0;
+  const period = match[3]?.toLowerCase();
+
+  if (period === "pm" && hour !== 12) hour += 12;
+  if (period === "am" && hour === 12) hour = 0;
+
+  return { hour, minute };
+}
+
+function getTimeOfDay(hour: number): TimeOfDay {
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  return "evening";
+}
+
+/**
+ * Parse service times string into structured format for filtering.
+ * Handles formats like: "Sun 9:00 AM; Sun 11:00 AM; Wed 7:00 PM"
+ */
+export function parseServiceTimesForFilter(serviceTimes: string | undefined): ParsedServiceTime[] {
+  if (!serviceTimes?.trim()) return [];
+
+  const results: ParsedServiceTime[] = [];
+  const parts = serviceTimes.split(/[;,]/).map((s) => s.trim()).filter(Boolean);
+
+  for (const part of parts) {
+    // Match formats like: "Sun 9:00 AM", "Sunday Morning 9:00 AM", "Fri 7pm"
+    const match = part.match(
+      /^(sun|mon|tue|wed|thu|fri|sat|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\w*\s+(?:\w+\s+)?(\d{1,2}:?\d{0,2}\s*(?:am|pm)?)/i
+    );
+
+    if (match) {
+      const day = DAY_MAP[match[1].toLowerCase()];
+      const time = parseTimeToHours(match[2]);
+
+      if (day && time) {
+        results.push({
+          day,
+          hour: time.hour,
+          minute: time.minute,
+          timeOfDay: getTimeOfDay(time.hour),
+          label: part.match(/\(([^)]+)\)/)?.[1],
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Check if a church's service times match the given filters.
+ */
+export function matchesServiceTimeFilter(
+  serviceTimes: string | undefined,
+  slots: Set<ServiceTimeSlot>,
+  timeOfDayFilter: TimeOfDay | "all"
+): boolean {
+  if (slots.size === 0) return true; // No filter = match all
+
+  const parsed = parseServiceTimesForFilter(serviceTimes);
+  if (parsed.length === 0) return false; // No service times = no match when filter is active
+
+  for (const svc of parsed) {
+    // Check time of day if specified
+    if (timeOfDayFilter !== "all" && svc.timeOfDay !== timeOfDayFilter) continue;
+
+    // Check slot matches
+    if (slots.has("sunday_morning") && svc.day === "sunday" && svc.timeOfDay === "morning") return true;
+    if (slots.has("sunday_evening") && svc.day === "sunday" && svc.timeOfDay === "evening") return true;
+    if (slots.has("friday") && svc.day === "friday") return true;
+    if (slots.has("saturday") && svc.day === "saturday") return true;
+    if (slots.has("weekday") && ["monday", "tuesday", "wednesday", "thursday"].includes(svc.day)) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Get service time slots for a church (for display).
+ */
+export function getServiceTimeSlots(serviceTimes: string | undefined): ServiceTimeSlot[] {
+  const parsed = parseServiceTimesForFilter(serviceTimes);
+  const slots = new Set<ServiceTimeSlot>();
+
+  for (const svc of parsed) {
+    if (svc.day === "sunday" && svc.timeOfDay === "morning") slots.add("sunday_morning");
+    if (svc.day === "sunday" && svc.timeOfDay === "evening") slots.add("sunday_evening");
+    if (svc.day === "friday") slots.add("friday");
+    if (svc.day === "saturday") slots.add("saturday");
+    if (["monday", "tuesday", "wednesday", "thursday"].includes(svc.day)) slots.add("weekday");
+  }
+
+  return Array.from(slots);
+}
+
+// ── Duplicate Detection ──
+
+/**
+ * Calculate haversine distance between two points in kilometers.
+ */
+export function haversineDistanceKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Calculate Levenshtein similarity between two strings (0-1).
+ */
+export function levenshteinSimilarity(a: string, b: string): number {
+  const s1 = a.toLowerCase().trim();
+  const s2 = b.toLowerCase().trim();
+  if (s1 === s2) return 1;
+  if (s1.length === 0 || s2.length === 0) return 0;
+
+  const matrix: number[][] = [];
+  for (let i = 0; i <= s1.length; i++) {
+    matrix[i] = [i];
+    for (let j = 1; j <= s2.length; j++) {
+      matrix[i][j] =
+        i === 0
+          ? j
+          : Math.min(
+              matrix[i - 1][j] + 1,
+              matrix[i][j - 1] + 1,
+              matrix[i - 1][j - 1] + (s1[i - 1] === s2[j - 1] ? 0 : 1)
+            );
+    }
+  }
+
+  const distance = matrix[s1.length][s2.length];
+  const maxLen = Math.max(s1.length, s2.length);
+  return 1 - distance / maxLen;
+}
+
+export interface DuplicateGroup {
+  churches: [Church, Church];
+  confidence: "high" | "medium";
+  distanceKm: number;
+  nameSimilarity: number;
+}
+
+/**
+ * Find potential duplicate churches based on distance and name similarity.
+ * Returns groups of likely duplicates.
+ */
+export function findDuplicates(churches: Church[]): DuplicateGroup[] {
+  const groups: DuplicateGroup[] = [];
+
+  for (let i = 0; i < churches.length; i++) {
+    for (let j = i + 1; j < churches.length; j++) {
+      const dist = haversineDistanceKm(
+        churches[i].lat,
+        churches[i].lng,
+        churches[j].lat,
+        churches[j].lng
+      );
+      const nameSim = levenshteinSimilarity(churches[i].name, churches[j].name);
+
+      if (dist < 0.1 && nameSim > 0.7) {
+        // Within 100m, 70% name match
+        groups.push({
+          churches: [churches[i], churches[j]],
+          confidence: "high",
+          distanceKm: dist,
+          nameSimilarity: nameSim,
+        });
+      } else if (dist < 0.05 && nameSim > 0.5) {
+        // Within 50m, 50% name match
+        groups.push({
+          churches: [churches[i], churches[j]],
+          confidence: "medium",
+          distanceKm: dist,
+          nameSimilarity: nameSim,
+        });
+      }
+    }
+  }
+
+  return groups;
+}
+
+/**
+ * Get potential duplicates for a specific church.
+ */
+export function getPotentialDuplicates(
+  church: Church,
+  allChurches: Church[]
+): { church: Church; confidence: "high" | "medium"; distanceKm: number; nameSimilarity: number }[] {
+  const duplicates: ReturnType<typeof getPotentialDuplicates> = [];
+
+  for (const other of allChurches) {
+    if (other.id === church.id) continue;
+
+    const dist = haversineDistanceKm(church.lat, church.lng, other.lat, other.lng);
+    const nameSim = levenshteinSimilarity(church.name, other.name);
+
+    if (dist < 0.1 && nameSim > 0.7) {
+      duplicates.push({
+        church: other,
+        confidence: "high",
+        distanceKm: dist,
+        nameSimilarity: nameSim,
+      });
+    } else if (dist < 0.05 && nameSim > 0.5) {
+      duplicates.push({
+        church: other,
+        confidence: "medium",
+        distanceKm: dist,
+        nameSimilarity: nameSim,
+      });
+    }
+  }
+
+  return duplicates;
+}
